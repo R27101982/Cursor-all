@@ -1,0 +1,235 @@
+# Пример каталога детерминированных правил проверки сметной документации.
+#
+# Идея: правило привязано к пункту Методики № 421/пр и к диапазону редакций, в которых
+# оно действует. Проверка выполняется в контексте даты определения сметной стоимости,
+# поэтому прошлогодний проект проверяется по прошлогодней норме.
+#
+# Это иллюстрация структуры, а не готовый к исполнению конфиг.
+
+meta:
+  normative: "Методика определения сметной стоимости (приказ Минстроя России № 421/пр)"
+  editions:
+    - id: ed-2022-557
+      order: "557/пр от 07.07.2022"
+      valid_from: 2022-09-11
+    - id: ed-2024-055
+      order: "55/пр от 30.01.2024"
+      valid_from: 2024-04-08
+    - id: ed-2025-030
+      order: "30/пр от 23.01.2025"
+      valid_from: 2025-03-24
+    - id: ed-2026-042
+      order: "42/пр от 30.01.2026"
+      valid_from: 2026-02-14
+
+rules:
+
+  - id: KA-001
+    title: "Срок обосновывающих документов конъюнктурного анализа"
+    clause: "п. 14"
+    severity: blocking
+    applies_to: konyunkturnyy_analiz.pozicii
+    editions: [ed-2022-557, ed-2024-055, ed-2025-030, ed-2026-042]
+    check: |
+      document_date >= smeta_date - months(6)
+    exception:
+      when: "object.special_status == true"
+      editions: [ed-2026-042]
+      check: |
+        document_date >= smeta_date - months(12)
+      note: >
+        Объекты из перечня проектов с особым статусом, утверждаемого Правительством РФ
+        в соответствии с п. 2 постановления от 15.02.2023 № 223.
+    message: >
+      Обосновывающий документ от {document_date} получен ранее допустимого срока
+      относительно даты определения сметной стоимости {smeta_date}.
+
+  - id: KA-002
+    title: "Требуемое количество ценовых предложений"
+    clause: "пп. 14, 90, 91"
+    severity: blocking
+    applies_to: konyunkturnyy_analiz.pozicii
+    check_by_resource_type:
+      material_resource: 3
+      other_costs: 3
+      guarantee: 3
+      imported_equipment: 2
+      transport_service: 2
+      individual_material_tkp: 2
+      adapted_equipment_tkp: 2
+      sole_supplier: 1
+    waiver:
+      required_document: "письмо заказчика об отсутствии требуемого количества цен"
+      note: "Прямо предусмотрено пп. 14, 90, 91."
+    message: >
+      По позиции «{name}» представлено {actual} ценовых предложений при требуемых
+      {required}; письмо заказчика об отсутствии предложений не приложено.
+
+  - id: KA-003
+    title: "Не более одного счёта (счёта-фактуры) на позицию"
+    clause: "п. 14"
+    severity: blocking
+    applies_to: konyunkturnyy_analiz.pozicii
+    check: |
+      count(documents where type in ["счёт", "счёт-фактура"]) <= 1
+
+  - id: KA-004
+    title: "Обязательные реквизиты обосновывающего документа"
+    clause: "п. 15"
+    severity: warning
+    applies_to: obosnovyvayushchie_dokumenty
+    required_fields:
+      - supplier_name
+      - supplier_inn
+      - contacts
+      - executor
+      - document_date
+      - price_validity
+      - vat_flag
+      - transport_included_flag
+      - supervision_included_flag
+    message: "В документе не заполнены обязательные сведения: {missing_fields}."
+
+  - id: KA-005
+    title: "Заготовительно-складские расходы"
+    clause: "п. 92"
+    severity: blocking
+    applies_to: konyunkturnyy_analiz.pozicii
+    rates:
+      material_resource: 2.0
+      metal_structures: 0.75
+      equipment: 1.2
+    zero_rate_for: ["вода", "пар", "электроэнергия", "сжатый воздух"]
+    check: |
+      abs(zsr_percent - expected_rate(resource_type)) < 0.001
+
+  - id: KA-006
+    title: "Регион производителя (поставщика)"
+    clause: "п. 14"
+    severity: warning
+    applies_to: konyunkturnyy_analiz.pozicii
+    check: |
+      supplier_region == object_region
+      or transport_costs_calculated == true
+    message: >
+      Поставщик расположен вне субъекта строительства, при этом затраты на доставку
+      до объекта не раскрыты отдельной графой.
+
+  - id: KA-007
+    title: "Признаки аффилированности поставщиков"
+    clause: "правоприменительная практика экспертизы"
+    severity: info
+    applies_to: konyunkturnyy_analiz.pozicii
+    check: |
+      no_shared_founders(suppliers)
+      and no_shared_address(suppliers)
+      and no_common_parent(suppliers)
+    note: >
+      Понятие аффилированности в Методике не формализовано. Правило даёт сигнал
+      для ручной проверки, решение принимает человек.
+
+  - id: KA-008
+    title: "Подписи под сводной таблицей конъюнктурного анализа"
+    clause: "п. 13"
+    severity: blocking
+    applies_to: konyunkturnyy_analiz
+    check: |
+      signed_by("составил") and signed_by("проверил")
+      and signed_by("застройщик (технический заказчик)")
+
+  - id: SM-001
+    title: "Резерв средств на непредвиденные работы и затраты"
+    clause: "п. 179"
+    severity: blocking
+    applies_to: svodnyy_smetnyy_raschet
+    editions: [ed-2026-042]
+    limits:
+      non_production: 2.0
+      production: 3.0
+      linear: 3.0
+      unique_hazardous_complex: 10.0
+    base: "итоги глав 1-12"
+    check: |
+      reserve_percent <= limit(object_type)
+      and reserve_base == "главы 1-12"
+
+  - id: SM-002
+    title: "Наименования и нумерация глав сводного сметного расчёта"
+    clause: "пп. 138, 139"
+    severity: blocking
+    applies_to: svodnyy_smetnyy_raschet.glavy
+    check: |
+      chapter_titles == reference_titles_pp87
+      and chapter_numbers_are_not_renumbered
+
+  - id: SM-003
+    title: "Шифры сметных расчётов"
+    clause: "пп. 29-34"
+    severity: warning
+    applies_to: smetnye_raschety
+    patterns:
+      lsr: '^ЛС-\d{2}-\d{2}-\d{2}(-\d+)?$'
+      osr: '^ОС-\d{2}-\d{2}(-\d+)?$'
+      sr: '^СР-\d+$'
+      ssrss: '^ССРСС(-\d+)?$'
+    check: |
+      lsr.prefix_matches(parent_osr.number)
+      and osr.prefix_matches(chapter_number)
+
+  - id: SM-004
+    title: "Стоимость по конъюнктурному анализу выделена в итогах"
+    clause: "п. 78"
+    severity: blocking
+    applies_to: lokalnyy_smetnyy_raschet.itogi
+    check: |
+      exists(line "в том числе по конъюнктурному анализу")
+      and abs(line.value - sum(ka_positions_in_lsr)) < 0.01
+
+  - id: VOR-001
+    title: "Воспроизводимость формулы расчёта объёма"
+    clause: "п. 35"
+    severity: warning
+    applies_to: vedomost_obemov_rabot.pozicii
+    check: |
+      formula_is_parseable(formula)
+      and abs(evaluate(formula) - quantity) < tolerance(unit)
+
+  - id: VOR-002
+    title: "Ссылка на чертежи и спецификации"
+    clause: "п. 35"
+    severity: warning
+    applies_to: vedomost_obemov_rabot.pozicii
+    check: |
+      drawing_reference is not empty
+
+  - id: VOR-003
+    title: "Соответствие объёмов ВОР и позиций локальной сметы"
+    clause: "п. 35"
+    severity: blocking
+    applies_to: cross_document
+    check: |
+      for each lsr_position:
+        exists vor_position with matching work and unit
+        and abs(convert(vor.quantity, lsr.unit) - lsr.quantity) < 0.001
+    message: >
+      Объём по позиции «{name}» в смете ({lsr_qty}) не соответствует ведомости
+      объёмов работ ({vor_qty}).
+
+  - id: DOC-001
+    title: "Комплектность приложений к сметной документации"
+    clause: "п. 27"
+    severity: blocking
+    applies_to: paket
+    required:
+      - poyasnitelnaya_zapiska
+      - vedomosti_obemov_rabot
+      - obosnovyvayushchie_dokumenty
+
+  - id: DOC-002
+    title: "Сопоставительная ведомость при изменении объёмов"
+    clause: "п. 189"
+    severity: blocking
+    applies_to: paket
+    when: "revision > 0 and physical_volumes_changed"
+    required:
+      - sopostavitelnaya_vedomost_prilozhenie_12
