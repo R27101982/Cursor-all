@@ -42,6 +42,16 @@
 - Ресурсно-индексный метод: [gostcheck.ru](https://gostcheck.ru/articles/resursno-indeksnyy-metod-sostavleniya-smet)
 - Переход обязательности XML-формата: [spbexp.ru](https://www.spbexp.ru/press-tsentr/news/ekspertiza-smet-tolko-v-xml-formate/)
 
+## Автоматизация проверки (к разделу 8)
+
+| Ресурс | Назначение |
+| --- | --- |
+| [Сервис комплексной проверки сметных расчётов (КПСР) Главгосэкспертизы](https://www.gge.ru/services/servis-kompleksnoy-proverki-smetnykh-raschetov/) | Проверка комплектности, соответствия XML-схемам, применённых норм по ФСНБ, наличия предложений и файлов-обоснований КАЦ |
+| [Открытый модуль предварительной проверки комплектности](https://gge.ru/press-center/news/glavgosekspertiza-rastet-v-tsifre-novoe-pribavlenie-v-servise-kpsr/) | Форматно-логическая проверка пакета без авторизации |
+| Обзор требований XML-экспертизы 2026: [expertsmet.ru](https://expertsmet.ru/articles/xml-ekspertiza-i-novye-trebovaniya-k-smetam-v-2026-godu/) | Практика подготовки машиночитаемой сметной документации |
+| Разбор возможностей и ограничений ИИ в сметном деле: [kt-team.ru](https://www.kt-team.ru/blog/ai-smetchik) | Обзор рыночных сервисов и границ их ответственности |
+| О галлюцинациях языковых моделей при работе с расценками: [vc.ru](https://vc.ru/ai/3080573-neyroset-dlya-proverki-smet) | Практическое обоснование требования заземления на справочники |
+
 ## Что перепроверять при использовании материала
 
 1. **Редакцию Методики № 421/пр** на дату определения сметной стоимости.
