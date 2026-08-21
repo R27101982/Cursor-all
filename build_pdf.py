@@ -128,7 +128,8 @@ strong { color: #000; }
 em { color: var(--muted); }
 """
 
-TIME_RE = re.compile(r"^(\d:\d\d–\d:\d\d)\s*—\s*(.+)$")
+# «0:10–0:16 — НАЗВАНИЕ» и «5 МИНУТ — НАЗВАНИЕ»: короткая метка слева, название справа.
+TIME_RE = re.compile(r"^([^—]{1,20}?)\s+—\s+(.+)$")
 
 
 def transform(html_body: str) -> str:
