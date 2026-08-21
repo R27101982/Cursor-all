@@ -1,0 +1,234 @@
+<!DOCTYPE html><html lang='ru'><head><meta charset='utf-8'><title>Реквизит для печати</title><style>
+@page { size: A4; margin: 12mm; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Source Sans 3", sans-serif; color: #1a1a1a; }
+
+.sheet { height: 273mm; break-after: page; display: flex; flex-direction: column; }
+.sheet:last-child { break-after: auto; }
+
+/* Буква-артефакт */
+.letter-sheet { align-items: center; justify-content: center; text-align: center; }
+.frame {
+  border: 4px double #9a6a1f;
+  border-radius: 6mm;
+  padding: 20mm 38mm 14mm;
+  background: #fcfaf4;
+}
+.glyph {
+  font-family: "Noto Serif", serif;
+  font-size: 270pt;
+  font-weight: 700;
+  line-height: 1;
+  color: #2c2a4a;
+}
+.frame .caption {
+  margin-top: 8mm;
+  font-size: 11pt;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  color: #9a6a1f;
+}
+.hint { margin-top: 10mm; font-size: 10pt; color: #8a8a8a; }
+
+/* Мини-буквы: вкладыш в снитч и запасные */
+.mini-sheet h1 { font-family: "Noto Serif", serif; font-size: 19pt; color: #2c2a4a; margin: 0 0 1mm; }
+.mini-sheet .lead { font-size: 10pt; color: #6b6b6b; margin-bottom: 8mm; }
+.mini-grid { display: flex; flex-wrap: wrap; gap: 6mm; }
+.mini {
+  width: 22mm; height: 22mm;
+  border: 1px dashed #9a6a1f;
+  display: flex; align-items: center; justify-content: center;
+  font-family: "Noto Serif", serif;
+  font-size: 26pt; font-weight: 700; color: #2c2a4a;
+}
+
+/* Записка Пивза */
+.note-sheet { justify-content: center; }
+.note {
+  border: 2px dashed #999;
+  padding: 16mm 14mm;
+  margin: 0 7mm;
+  background: #fdfdf8;
+  transform: rotate(-0.8deg);
+}
+.note .line {
+  font-family: "Noto Serif", serif;
+  font-style: italic;
+  font-size: 26pt;
+  line-height: 1.55;
+  color: #23233a;
+}
+.note .sign {
+  text-align: right;
+  font-family: "Noto Serif", serif;
+  font-style: italic;
+  font-size: 30pt;
+  margin-top: 8mm;
+  color: #23233a;
+  transform: rotate(-3deg);
+}
+.note-when {
+  margin-bottom: 6mm;
+  font-size: 10pt;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: #9a6a1f;
+}
+
+/* Шпаргалка: обычный поток, иначе многоколоночный блок обрезается по высоте */
+.sheet.cheat { display: block; height: auto; }
+.cheat h1 {
+  font-family: "Noto Serif", serif;
+  font-size: 19pt;
+  color: #2c2a4a;
+  margin: 0 0 1mm;
+}
+.cheat .lead { font-size: 10pt; color: #6b6b6b; margin-bottom: 5mm; }
+table { width: 100%; border-collapse: collapse; font-size: 10.4pt; }
+th { text-align: left; background: #f2efe6; color: #2c2a4a; border-bottom: 1.5px solid #9a6a1f; }
+th, td { padding: 1.8mm 2.5mm; border-bottom: 1px solid #ddd8c8; vertical-align: top; }
+td.t { font-variant-numeric: tabular-nums; color: #9a6a1f; font-weight: 600; white-space: nowrap; }
+td.l { font-weight: 700; font-size: 13.5pt; text-align: center; color: #2c2a4a; }
+.cheat h2 {
+  font-family: "Noto Serif", serif;
+  font-size: 13pt;
+  color: #2c2a4a;
+  margin: 0 0 2mm;
+  break-after: avoid;
+}
+.cheat ul { margin: 0 0 5mm; padding-left: 4.5mm; font-size: 9.6pt; line-height: 1.4; }
+.cheat-cols { column-count: 2; column-gap: 7mm; margin-top: 5mm; }
+.cheat-cols section { break-inside: avoid; }
+</style></head><body>
+<section class="sheet cheat">
+  <h1>Шпаргалка ведущего</h1>
+  <div class="lead">
+    Два листа в карман мантии: тайминг и напоминания. Полная версия 55 минут. Заклинание: А · Г · Л · А · Я.
+    Чтобы уложиться в 45 — выбросить «Клещей Пивза» и «Тропу порталов», сократить охоту и кольца.
+  </div>
+  <table>
+    <tr><th>Время</th><th>Блок</th><th>Что не забыть</th><th>Буква</th></tr>
+    <tr><td class="t">0:00</td><td><b>Появление</b></td><td>Сундук под тканью. Записка №1. Хихиканье</td><td class="l">—</td></tr><tr><td class="t">0:03</td><td><b>Шляпа</b></td><td>Четыре обруча — круги факультетов. Палочки и 3 правила</td><td class="l">—</td></tr><tr><td class="t">0:08</td><td><b>Палочки</b></td><td>Палочка-верёвка. Окаменеть. Хихиканье</td><td class="l">—</td></tr><tr><td class="t">0:11</td><td><b>Шторм</b></td><td>Люмос — Нокс — Левиоса — Петрификус — Риддикулус</td><td class="l">—</td></tr><tr><td class="t">0:14</td><td><b>Клещи Пивза</b></td><td>Прищепки всем и себе. С себя снимать нельзя</td><td class="l">—</td></tr><tr><td class="t">0:17</td><td><b>Сила</b></td><td>Состав на руки. Стакан воды у помощника</td><td class="l">—</td></tr><tr><td class="t">0:20</td><td><b>Искра</b></td><td>Стаканчики всем. Шарик по цепочке. Кубок на сундук</td><td class="l">—</td></tr><tr><td class="t">0:23</td><td><b>Охота на снитчей</b></td><td>Руками нельзя — ложки. Рукавицы. Золотой. Записка №2</td><td class="l">Л</td></tr><tr><td class="t">0:30</td><td><b>Кольца квиддича</b></td><td>Родители держат обручи. Стаканчики. Кольцо — на землю</td><td class="l">Г</td></tr><tr><td class="t">0:35</td><td><b>Левиоса</b></td><td>Помощник тянет леску на счёт «три». Записка №3</td><td class="l">А</td></tr><tr><td class="t">0:39</td><td><b>Запретная зона</b></td><td>Снежки, переодевание, «Кривоногус», шарф</td><td class="l">А</td></tr><tr><td class="t">0:44</td><td><b>Тропа порталов</b></td><td>Обручи цепочкой. Второй круг — взявшись за руки</td><td class="l">—</td></tr><tr><td class="t">0:46</td><td><b>Имя вслух</b></td><td>Музыку выключить. Записка №4. Палочки на Аглаю, хором имя</td><td class="l">Я</td></tr><tr><td class="t">0:48</td><td><b>Финал</b></td><td>Отпереть сундук + хлопушка. Подарок и свечи</td><td class="l">—</td></tr><tr><td class="t">0:52</td><td><b>Круг</b></td><td>Медали каждому, пожелания, хором «С днём рождения»</td><td class="l">—</td></tr>
+  </table>
+
+  <div class="cheat-cols">
+    <section>
+      <h2>Сигналы помощнику</h2>
+      <ul>
+        <li>Хихиканье Пивза — после письма, после сломанной палочки, после второго «А».</li>
+        <li>Подбросить прищепки — через минуту после начала «Клещей».</li>
+        <li>Ложки — раздать сразу после команды «руками нельзя».</li>
+        <li>Досыпать снитчи — перед заклятием неуклюжести, пока дети отдыхают.</li>
+        <li>Искра в кубок на сундуке — после каждой найденной буквы.</li>
+        <li>Леска — тянуть на «три», второй раз выше и держать, пока не заберу свиток.</li>
+        <li>Стакан воды — в сцене с дымом, по-настоящему и сразу.</li>
+        <li>Секундомер — на тропе порталов. Рекорд Пивза 20 секунд.</li>
+        <li>Замок сундука — отпереть за секунду до хорового «АГЛАЯ».</li>
+        <li>Хлопушка и музыка на полную — ровно на слове «Я».</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>После торта, по 5 минут</h2>
+      <ul>
+        <li>Дуэль факультетов — танцевальный баттл, музыка по 40 секунд</li><li>Магические фанты — мешочек и карточки заданий, работает сидя</li><li>Парные заклинания — ленточки, найди свой цвет</li><li>Поиск цвета — два круга мелом, «раз, два, три — жёлтый найди»</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Если что-то пошло не так</h2>
+      <ul>
+        <li>Шумят — молча поднять палочку и ждать. Не перекрикивать.</li>
+        <li>Перевозбудились — уронить голос до шёпота и присесть на корточки.</li>
+        <li>Угадали имя раньше времени — играть недоверие: «Имя не может быть заклинанием».</li>
+        <li>Кольцо Пивза не даётся — молча показать: поднять руку над обручем и разжать пальцы.</li>
+        <li>Отстаём — режем 4-ю фазу охоты, переодевание и второй круг тропы.</li>
+        <li>Ребёнок стесняется — хранитель мешка, судья на кольцах, счётчик голов.</li>
+        <li>Никакого счёта и выбывания: «Факультеты не соревнуются, а складываются».</li>
+        <li>Пересчитать шарики до ухода с площадки.</li>
+      </ul>
+    </section>
+  </div>
+</section>
+
+<section class="sheet letter-sheet">
+  <div class="frame">
+    <div class="glyph">Л</div>
+    <div class="caption">первый артефакт</div>
+  </div>
+  <div class="hint">Спрятать: внутрь золотого снитча, снитч — в траву у края площадки. Свернуть в свиток и перевязать нитью.</div>
+</section>
+
+<section class="sheet letter-sheet">
+  <div class="frame">
+    <div class="glyph">Г</div>
+    <div class="caption">второй артефакт</div>
+  </div>
+  <div class="hint">Спрятать: привязать ниткой к кольцу Пивза, которое лежит на земле. Свернуть в свиток и перевязать нитью.</div>
+</section>
+
+<section class="sheet letter-sheet">
+  <div class="frame">
+    <div class="glyph">А</div>
+    <div class="caption">третий артефакт</div>
+  </div>
+  <div class="hint">Спрятать: под сундук, на землю. Свернуть в свиток и перевязать нитью.</div>
+</section>
+
+<section class="sheet letter-sheet">
+  <div class="frame">
+    <div class="glyph">А</div>
+    <div class="caption">четвёртый артефакт</div>
+  </div>
+  <div class="hint">Спрятать: в хулахуп в Запретной зоне. Свернуть в свиток и перевязать нитью.</div>
+</section>
+
+<section class="sheet letter-sheet">
+  <div class="frame">
+    <div class="glyph">Я</div>
+    <div class="caption">пятый артефакт</div>
+  </div>
+  <div class="hint">Спрятать: в карман имениннице, заранее и через маму. Свернуть в свиток и перевязать нитью.</div>
+</section>
+
+<section class="sheet mini-sheet">
+  <h1>Мини-буквы</h1>
+  <div class="lead">
+    Вырезать по пунктиру и свернуть в трубочку. Буква Л кладётся внутрь золотого снитча —
+    большая карточка туда не влезет. Остальные — запасные, на случай дождя и потерь.
+  </div>
+  <div class="mini-grid"><div class="mini">Л</div><div class="mini">Г</div><div class="mini">А</div><div class="mini">А</div><div class="mini">Я</div><div class="mini">Л</div><div class="mini">Г</div><div class="mini">А</div><div class="mini">А</div><div class="mini">Я</div><div class="mini">Л</div><div class="mini">Г</div><div class="mini">А</div><div class="mini">А</div><div class="mini">Я</div><div class="mini">Л</div><div class="mini">Г</div><div class="mini">А</div><div class="mini">А</div><div class="mini">Я</div></div>
+</section>
+
+<section class="sheet note-sheet">
+  <div class="note-when">Записка №1 — в самом начале, из чемодана</div>
+  <div class="note">
+    <div class="line" style="transform: rotate(0.5deg)">Профессор!</div><div class="line" style="transform: rotate(-0.5deg)">Заклинание я спрятал.</div><div class="line" style="transform: rotate(0.5deg)">Ищите. Только вы всё равно</div><div class="line" style="transform: rotate(-0.5deg)">не найдёте, потому что вы</div><div class="line" style="transform: rotate(0.5deg)">взрослый и скучный.</div>
+    <div class="sign">Пивз</div>
+  </div>
+</section>
+
+<section class="sheet note-sheet">
+  <div class="note-when">Записка №2 — после проверки силы, перед кольцами</div>
+  <div class="note">
+    <div class="line" style="transform: rotate(0.5deg)">Одну нашли.</div><div class="line" style="transform: rotate(-0.5deg)">Вторую я закинул в кольцо.</div><div class="line" style="transform: rotate(0.5deg)">Достаньте,</div><div class="line" style="transform: rotate(-0.5deg)">если умеете летать.</div>
+    <div class="sign">Пивз</div>
+  </div>
+</section>
+
+<section class="sheet note-sheet">
+  <div class="note-when">Записка №3 — после того, как подняли сундук</div>
+  <div class="note">
+    <div class="line" style="transform: rotate(0.5deg)">Четвёртая буква</div><div class="line" style="transform: rotate(-0.5deg)">у стражей.</div><div class="line" style="transform: rotate(0.5deg)">Они спят.</div><div class="line" style="transform: rotate(-0.5deg)">Разбудите — пожалеете.</div>
+    <div class="sign">Пивз</div>
+  </div>
+</section>
+
+<section class="sheet note-sheet">
+  <div class="note-when">Записка №4 — перед последним испытанием</div>
+  <div class="note">
+    <div class="line" style="transform: rotate(0.5deg)">Последнюю букву</div><div class="line" style="transform: rotate(-0.5deg)">я не прятал.</div><div class="line" style="transform: rotate(0.5deg)">Её нельзя найти.</div><div class="line" style="transform: rotate(-0.5deg)">Её можно только</div><div class="line" style="transform: rotate(0.5deg)">получить в подарок.</div>
+    <div class="sign">Пивз</div>
+  </div>
+</section>
+</body></html>
