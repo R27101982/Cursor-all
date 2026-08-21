@@ -75,7 +75,8 @@ body { margin: 0; font-family: "Source Sans 3", sans-serif; color: #1a1a1a; }
   color: #9a6a1f;
 }
 
-/* Шпаргалка */
+/* Шпаргалка: обычный поток, иначе многоколоночный блок обрезается по высоте */
+.sheet.cheat { display: block; height: auto; }
 .cheat h1 {
   font-family: "Noto Serif", serif;
   font-size: 19pt;
@@ -83,28 +84,31 @@ body { margin: 0; font-family: "Source Sans 3", sans-serif; color: #1a1a1a; }
   margin: 0 0 1mm;
 }
 .cheat .lead { font-size: 10pt; color: #6b6b6b; margin-bottom: 5mm; }
-table { width: 100%; border-collapse: collapse; font-size: 9.8pt; }
+table { width: 100%; border-collapse: collapse; font-size: 10.4pt; }
 th { text-align: left; background: #f2efe6; color: #2c2a4a; border-bottom: 1.5px solid #9a6a1f; }
-th, td { padding: 1.6mm 2.5mm; border-bottom: 1px solid #ddd8c8; vertical-align: top; }
+th, td { padding: 1.8mm 2.5mm; border-bottom: 1px solid #ddd8c8; vertical-align: top; }
 td.t { font-variant-numeric: tabular-nums; color: #9a6a1f; font-weight: 600; white-space: nowrap; }
-td.l { font-weight: 700; font-size: 12pt; text-align: center; color: #2c2a4a; }
+td.l { font-weight: 700; font-size: 13.5pt; text-align: center; color: #2c2a4a; }
 .cheat h2 {
   font-family: "Noto Serif", serif;
-  font-size: 12pt;
+  font-size: 13pt;
   color: #2c2a4a;
-  margin: 0 0 1.5mm;
+  margin: 0 0 2mm;
   break-after: avoid;
 }
-.cheat ul { margin: 0 0 5mm; padding-left: 4.5mm; font-size: 9.3pt; line-height: 1.42; }
+.cheat ul { margin: 0 0 5mm; padding-left: 4.5mm; font-size: 9.6pt; line-height: 1.4; }
 .cheat-cols { column-count: 2; column-gap: 7mm; margin-top: 5mm; }
 .cheat-cols section { break-inside: avoid; }
 </style></head><body>
 <section class="sheet cheat">
   <h1>Шпаргалка ведущего</h1>
-  <div class="lead">Один лист в карман мантии. Заклинание: А · Г · Л · А · Я</div>
+  <div class="lead">
+    Два листа в карман мантии: тайминг и напоминания. Полная версия 55 минут. Заклинание: А · Г · Л · А · Я.
+    Чтобы уложиться в 45 — выбросить «Клещей Пивза» и «Тропу порталов», сократить охоту и кольца.
+  </div>
   <table>
     <tr><th>Время</th><th>Блок</th><th>Что не забыть</th><th>Буква</th></tr>
-    <tr><td class="t">0:00</td><td><b>Появление</b></td><td>Сундук под тканью. Записка №1. Хихиканье. Ровно 2 минуты</td><td class="l">—</td></tr><tr><td class="t">0:02</td><td><b>Распределение</b></td><td>Четыре угла размечены. Шляпа частит, дети бегут</td><td class="l">—</td></tr><tr><td class="t">0:04</td><td><b>Палочки</b></td><td>Палочка-верёвка. Окаменеть. 3 правила. Хихиканье</td><td class="l">—</td></tr><tr><td class="t">0:07</td><td><b>Имена + шторм</b></td><td>Бегут к названному. Люмос-Нокс-Левиоса-Петрификус</td><td class="l">—</td></tr><tr><td class="t">0:10</td><td><b>Охота на снитчей</b></td><td>Подбросить шарики. Руками нельзя — ложки. Рукавицы. Золотой</td><td class="l">Л</td></tr><tr><td class="t">0:17</td><td><b>Сила</b></td><td>Состав на руки. Стакан воды. Записка №2</td><td class="l">—</td></tr><tr><td class="t">0:19</td><td><b>Кольца квиддича</b></td><td>Родители держат обручи. Стаканчики. Кольцо — на землю</td><td class="l">Г</td></tr><tr><td class="t">0:24</td><td><b>Левиоса</b></td><td>Помощник тянет леску на счёт «три». Записка №3</td><td class="l">А</td></tr><tr><td class="t">0:28</td><td><b>Запретная зона</b></td><td>Снежки, переодевание, «Кривоногус», шарф</td><td class="l">А</td></tr><tr><td class="t">0:33</td><td><b>Тропа порталов</b></td><td>Обручи цепочкой. Второй круг — взявшись за руки</td><td class="l">—</td></tr><tr><td class="t">0:35</td><td><b>Имя вслух</b></td><td>Музыку выключить. Записка №4. Палочки на Аглаю, хором имя</td><td class="l">Я</td></tr><tr><td class="t">0:37</td><td><b>Финал</b></td><td>Отпереть сундук + хлопушка. Подарок и свечи</td><td class="l">—</td></tr><tr><td class="t">0:41</td><td><b>Круг</b></td><td>Медали каждому, пожелания, хором «С днём рождения»</td><td class="l">—</td></tr>
+    <tr><td class="t">0:00</td><td><b>Появление</b></td><td>Сундук под тканью. Записка №1. Хихиканье</td><td class="l">—</td></tr><tr><td class="t">0:03</td><td><b>Шляпа</b></td><td>Четыре обруча — круги факультетов. Палочки и 3 правила</td><td class="l">—</td></tr><tr><td class="t">0:08</td><td><b>Палочки</b></td><td>Палочка-верёвка. Окаменеть. Хихиканье</td><td class="l">—</td></tr><tr><td class="t">0:11</td><td><b>Шторм</b></td><td>Люмос — Нокс — Левиоса — Петрификус — Риддикулус</td><td class="l">—</td></tr><tr><td class="t">0:14</td><td><b>Клещи Пивза</b></td><td>Прищепки всем и себе. С себя снимать нельзя</td><td class="l">—</td></tr><tr><td class="t">0:17</td><td><b>Сила</b></td><td>Состав на руки. Стакан воды у помощника</td><td class="l">—</td></tr><tr><td class="t">0:20</td><td><b>Искра</b></td><td>Стаканчики всем. Шарик по цепочке. Кубок на сундук</td><td class="l">—</td></tr><tr><td class="t">0:23</td><td><b>Охота на снитчей</b></td><td>Руками нельзя — ложки. Рукавицы. Золотой. Записка №2</td><td class="l">Л</td></tr><tr><td class="t">0:30</td><td><b>Кольца квиддича</b></td><td>Родители держат обручи. Стаканчики. Кольцо — на землю</td><td class="l">Г</td></tr><tr><td class="t">0:35</td><td><b>Левиоса</b></td><td>Помощник тянет леску на счёт «три». Записка №3</td><td class="l">А</td></tr><tr><td class="t">0:39</td><td><b>Запретная зона</b></td><td>Снежки, переодевание, «Кривоногус», шарф</td><td class="l">А</td></tr><tr><td class="t">0:44</td><td><b>Тропа порталов</b></td><td>Обручи цепочкой. Второй круг — взявшись за руки</td><td class="l">—</td></tr><tr><td class="t">0:46</td><td><b>Имя вслух</b></td><td>Музыку выключить. Записка №4. Палочки на Аглаю, хором имя</td><td class="l">Я</td></tr><tr><td class="t">0:48</td><td><b>Финал</b></td><td>Отпереть сундук + хлопушка. Подарок и свечи</td><td class="l">—</td></tr><tr><td class="t">0:52</td><td><b>Круг</b></td><td>Медали каждому, пожелания, хором «С днём рождения»</td><td class="l">—</td></tr>
   </table>
 
   <div class="cheat-cols">
@@ -112,8 +116,10 @@ td.l { font-weight: 700; font-size: 12pt; text-align: center; color: #2c2a4a; }
       <h2>Сигналы помощнику</h2>
       <ul>
         <li>Хихиканье Пивза — после письма, после сломанной палочки, после второго «А».</li>
+        <li>Подбросить прищепки — через минуту после начала «Клещей».</li>
         <li>Ложки — раздать сразу после команды «руками нельзя».</li>
         <li>Досыпать снитчи — перед заклятием неуклюжести, пока дети отдыхают.</li>
+        <li>Искра в кубок на сундуке — после каждой найденной буквы.</li>
         <li>Леска — тянуть на «три», второй раз выше и держать, пока не заберу свиток.</li>
         <li>Стакан воды — в сцене с дымом, по-настоящему и сразу.</li>
         <li>Секундомер — на тропе порталов. Рекорд Пивза 20 секунд.</li>
