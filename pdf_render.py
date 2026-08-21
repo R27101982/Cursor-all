@@ -12,7 +12,8 @@ def render(html_path: Path, pdf_path: Path, timeout: float = 90) -> None:
 
     pdf_path.unlink(missing_ok=True)
 
-    with tempfile.TemporaryDirectory() as profile:
+    # Chrome иногда дописывает профиль уже после terminate, поэтому чистим мягко.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:
         proc = subprocess.Popen(
             [
                 "google-chrome",
