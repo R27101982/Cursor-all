@@ -183,12 +183,39 @@ try {
     throw "Account $AdminUser not found."
 }
 
+function ConvertTo-UserName {
+    param([string]$Line)
+    $t = $Line.Trim()
+    if (-not $t) { return $null }
+    if ($t -match '^\s*#') { return $null }
+
+    # Skip header-like lines
+    if ($t -match '(?i)password|username|login') { return $null }
+    # Cyrillic header "Polzovatel" / "Parol"
+    $hdrUser = -join ([char[]]@(0x041F,0x043E,0x043B,0x044C,0x0437,0x043E,0x0432,0x0430,0x0442,0x0435,0x043B))
+    $hdrPass = -join ([char[]]@(0x041F,0x0430,0x0440,0x043E,0x043B))
+    if ($t -match [regex]::Escape($hdrUser) -or $t -match [regex]::Escape($hdrPass)) { return $null }
+
+    # "1. Potapov FhU2i-qC9" / "2. Kartashov" / "Potapov"
+    if ($t -match '^\s*\d+\.\s*([A-Za-z0-9._-]{1,20})\b') {
+        return $Matches[1]
+    }
+    if ($t -match '^\s*([A-Za-z0-9._-]{1,20})\s*$') {
+        return $Matches[1]
+    }
+    if ($t -match '^\s*([A-Za-z0-9._-]{1,20})\b') {
+        return $Matches[1]
+    }
+    return $null
+}
+
 $names = Get-Content -LiteralPath $listFile -Encoding UTF8 |
-    ForEach-Object { $_.Trim() } |
-    Where-Object { $_ -and ($_ -notmatch '^\s*#') }
+    ForEach-Object { ConvertTo-UserName $_ } |
+    Where-Object { $_ } |
+    Select-Object -Unique
 
 if (-not $names) {
-    throw "Users list is empty: $listFile"
+    throw "Users list is empty or has no valid names: $listFile. Use one username per line, e.g. Potapov"
 }
 
 if (-not (Test-Path -LiteralPath $PasswordsFile)) {

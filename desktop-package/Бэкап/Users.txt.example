@@ -1,0 +1,10 @@
+# One username per line (ASCII). Examples of accepted lines:
+Potapov
+Kartashov
+Ivanov
+
+# Also accepted:
+# 1. Potapov
+# 2. Kartashov something
+
+# Not needed in this file: passwords (script generates them)
