@@ -1,10 +1,19 @@
-Запуск от имени администратора:
+Сервер: LS1
+Пользователь: admin
+Папка скрипта: C:\Users\admin\Desktop\BackupUsers\
 
-powershell -ExecutionPolicy Bypass -File C:\Users\Ruslan\Desktop\Бэкап\New-BackupUsers.ps1
+Запуск (PowerShell от имени администратора):
+
+powershell -ExecutionPolicy Bypass -File C:\Users\admin\Desktop\BackupUsers\New-BackupUsers.ps1
 
 Перед запуском:
-1. Скопируйте содержимое этой папки в C:\Users\Ruslan\Desktop\Бэкап\
-2. Создайте C:\Users\admin\Desktop\Пользователи.txt (по одному имени в строке)
-   (если скрипт крутится под admin на LS1 — путь к списку внутри скрипта: C:\Users\admin\Desktop\Пользователи.txt)
-3. Группа Quantor должна уже существовать
-4. PowerShell от администратора → команда выше
+1. Папка скрипта: C:\Users\admin\Desktop\BackupUsers\New-BackupUsers.ps1
+2. Список имён: C:\Users\admin\Desktop\Пользователи.txt (по одному имени в строке)
+3. Группа Quantor уже существует
+4. Войти как admin на LS1 и запустить команду выше от администратора
+
+Скрипт сам использует:
+- пароли → C:\Users\admin\Desktop\user-passwords.txt
+- папки  → C:\Users\admin\Desktop\Backup\QformProjects\<User>\...
+           C:\Users\admin\Desktop\Backup\Support\<User>\...
+- ACL: SYSTEM + Администраторы + LS1\admin = Full; пользователь = Read/ReadAndExecute

@@ -13,7 +13,8 @@
   - ACL: LS1\admin и Администраторы — Full; пользователь — Read+ReadAndExecute
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File C:\path\New-BackupUsers.ps1
+  # На LS1, под admin, скрипт лежит здесь:
+  powershell -ExecutionPolicy Bypass -File C:\Users\admin\Desktop\BackupUsers\New-BackupUsers.ps1
 #>
 
 $ErrorActionPreference = 'Stop'
