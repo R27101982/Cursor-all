@@ -1,29 +1,18 @@
 #Requires -RunAsAdministrator
-<#
-.SYNOPSIS
-  Создаёт локальных пользователей на LS1, папки бэкапа и ACL.
-
-.DESCRIPTION
-  - Читает имена из C:\Users\admin\Desktop\Пользователи.txt (по одному в строке)
-  - Если пользователь уже существует — пропускает (не трогает пароль, папки, права)
-  - Иначе: создаёт пользователя, 8-символьный пароль (буквы+цифры), пишет в user-passwords.txt
-  - Добавляет в группу Quantor
-  - Запрещает интерактивный вход и вход по RDP (сетевой доступ к шарам остаётся)
-  - Создаёт папки QformProjects/<User>/Data|Versions и Support/<User>/Data|Versions
-  - ACL: LS1\admin и Администраторы — Full; пользователь — Read+ReadAndExecute
-
-.EXAMPLE
-  # На LS1, под admin, скрипт лежит здесь:
-  powershell -ExecutionPolicy Bypass -File C:\Users\admin\Desktop\BackupUsers\New-BackupUsers.ps1
-#>
+# ASCII-only source for Windows PowerShell 5.1 (no UTF-8 BOM issues with Cyrillic).
+# Target: LS1, run as admin from C:\Users\admin\Desktop\BackupUsers\
 
 $ErrorActionPreference = 'Stop'
 
-$UsersFile     = 'C:\Users\admin\Desktop\Пользователи.txt'
-$PasswordsFile = 'C:\Users\admin\Desktop\user-passwords.txt'
-$BackupRoot    = 'C:\Users\admin\Desktop\Backup'
+# "Polzovateli.txt" Cyrillic filename built from codepoints (avoids encoding breakage)
+$UsersListName = -join ([char[]]@(0x041F,0x043E,0x043B,0x044C,0x0437,0x043E,0x0432,0x0430,0x0442,0x0435,0x043B,0x0438)) + '.txt'
+$DesktopDir    = 'C:\Users\admin\Desktop'
+$UsersFile     = Join-Path $DesktopDir $UsersListName
+$UsersFileAlt  = Join-Path $DesktopDir 'Users.txt'   # ASCII fallback
+$PasswordsFile = Join-Path $DesktopDir 'user-passwords.txt'
+$BackupRoot    = Join-Path $DesktopDir 'Backup'
 $GroupName     = 'Quantor'
-$AdminUser     = "$env:COMPUTERNAME\admin"   # LS1\admin на этом сервере
+$AdminUser     = "$env:COMPUTERNAME\admin"
 
 function Test-IsAdministrator {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -33,7 +22,7 @@ function Test-IsAdministrator {
 
 function New-RandomPassword {
     param([int]$Length = 8)
-    $digits  = '23456789'.ToCharArray()          # без 0/1 — меньше путаницы
+    $digits  = '23456789'.ToCharArray()
     $letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'.ToCharArray()
     $all     = $digits + $letters
 
@@ -49,13 +38,13 @@ function New-RandomPassword {
 
 function Deny-InteractiveLogon {
     param([Parameter(Mandatory)][string]$UserName)
-    # secedit INF принимает SID в виде *S-1-5-... (не DOMAIN\user)
+
     $sid = $null
     try {
         $sid = ([Security.Principal.NTAccount]"$env:COMPUTERNAME\$UserName").
             Translate([Security.Principal.SecurityIdentifier]).Value
     } catch {
-        Write-Warning "Не удалось получить SID для $UserName. Пропуск Deny logon."
+        Write-Warning "Cannot resolve SID for $UserName. Skip Deny logon."
         return
     }
     $principal = "*$sid"
@@ -67,7 +56,7 @@ function Deny-InteractiveLogon {
     try {
         $exportOut = & secedit.exe /export /cfg $export /areas USER_RIGHTS 2>&1
         if (-not (Test-Path $export)) {
-            Write-Warning "Не удалось экспортировать политику прав. Пропуск Deny logon для $UserName. $exportOut"
+            Write-Warning "secedit export failed for $UserName. $exportOut"
             return
         }
 
@@ -117,7 +106,7 @@ function Deny-InteractiveLogon {
 
         $cfgOut = & secedit.exe /configure /db $db /cfg $import /areas USER_RIGHTS 2>&1
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "secedit не применил Deny logon для $UserName (код $LASTEXITCODE). $cfgOut"
+            Write-Warning "secedit configure failed for $UserName (exit $LASTEXITCODE). $cfgOut"
         }
     }
     finally {
@@ -132,7 +121,7 @@ function Set-BackupFolderAcl {
     )
 
     $acl = New-Object System.Security.AccessControl.DirectorySecurity
-    $acl.SetAccessRuleProtection($true, $false)  # без наследования
+    $acl.SetAccessRuleProtection($true, $false)
 
     $inherit = [Security.AccessControl.InheritanceFlags]::ContainerInherit -bor `
                [Security.AccessControl.InheritanceFlags]::ObjectInherit
@@ -142,19 +131,15 @@ function Set-BackupFolderAcl {
     $full = [Security.AccessControl.FileSystemRights]::FullControl
     $readExec = [Security.AccessControl.FileSystemRights]::ReadAndExecute
 
-    # SYSTEM
     $system = New-Object Security.Principal.SecurityIdentifier('S-1-5-18')
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($system, $full, $inherit, $propagate, $typeAllow)))
 
-    # Администраторы (SID — не зависит от языка ОС)
     $admins = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($admins, $full, $inherit, $propagate, $typeAllow)))
 
-    # LS1\admin
     $adminNt = New-Object Security.Principal.NTAccount($AdminUser)
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($adminNt, $full, $inherit, $propagate, $typeAllow)))
 
-    # Созданный пользователь — чтение / чтение и выполнение
     $userNt = New-Object Security.Principal.NTAccount("$env:COMPUTERNAME\$UserName")
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($userNt, $readExec, $inherit, $propagate, $typeAllow)))
 
@@ -175,30 +160,35 @@ function Get-UserFolderPaths {
 # --- main ---
 
 if (-not (Test-IsAdministrator)) {
-    throw 'Запустите скрипт от имени администратора.'
+    throw 'Run this script as Administrator.'
 }
 
-if (-not (Test-Path -LiteralPath $UsersFile)) {
-    throw "Не найден файл списка: $UsersFile"
+$listFile = $null
+if (Test-Path -LiteralPath $UsersFile) {
+    $listFile = $UsersFile
+} elseif (Test-Path -LiteralPath $UsersFileAlt) {
+    $listFile = $UsersFileAlt
+    Write-Host "Using ASCII list file: $UsersFileAlt"
+} else {
+    throw "Users list not found. Create: $UsersFile  (or $UsersFileAlt)"
 }
 
 if (-not (Get-LocalGroup -Name $GroupName -ErrorAction SilentlyContinue)) {
-    throw "Группа '$GroupName' не найдена. Создайте её заранее."
+    throw "Local group '$GroupName' not found. Create it first."
 }
 
-# Проверка, что admin существует
 try {
     $null = ([Security.Principal.NTAccount]$AdminUser).Translate([Security.Principal.SecurityIdentifier])
 } catch {
-    throw "Учётка $AdminUser не найдена."
+    throw "Account $AdminUser not found."
 }
 
-$names = Get-Content -LiteralPath $UsersFile -Encoding UTF8 |
+$names = Get-Content -LiteralPath $listFile -Encoding UTF8 |
     ForEach-Object { $_.Trim() } |
     Where-Object { $_ -and ($_ -notmatch '^\s*#') }
 
 if (-not $names) {
-    throw 'В файле Пользователи.txt нет имён.'
+    throw "Users list is empty: $listFile"
 }
 
 if (-not (Test-Path -LiteralPath $PasswordsFile)) {
@@ -208,20 +198,23 @@ if (-not (Test-Path -LiteralPath $PasswordsFile)) {
 $created = 0
 $skipped = 0
 
+# Cyrillic group name "Polzovateli" for built-in Users on RU Windows
+$UsersGroupRu = -join ([char[]]@(0x041F,0x043E,0x043B,0x044C,0x0437,0x043E,0x0432,0x0430,0x0442,0x0435,0x043B,0x0438))
+
 foreach ($name in $names) {
     if ($name -notmatch '^[a-zA-Z0-9._-]{1,20}$') {
-        Write-Warning "Пропуск недопустимого имени: '$name'"
+        Write-Warning "Skip invalid username: '$name'"
         continue
     }
 
     $existing = Get-LocalUser -Name $name -ErrorAction SilentlyContinue
     if ($existing) {
-        Write-Host "[SKIP] Пользователь уже есть: $name — пароль, папки и права не меняем."
+        Write-Host "[SKIP] User exists: $name (password/folders/ACL not changed)"
         $skipped++
         continue
     }
 
-    Write-Host "[NEW]  Создаём пользователя: $name"
+    Write-Host "[NEW]  Creating user: $name"
 
     $plain = New-RandomPassword -Length 8
     $secure = ConvertTo-SecureString $plain -AsPlainText -Force
@@ -236,11 +229,10 @@ foreach ($name in $names) {
 
     Add-LocalGroupMember -Group $GroupName -Member $name
 
-    # Убрать из Users, если попал автоматически — снижает право локального входа по умолчанию
     try {
         $usersGroup = Get-LocalGroup -Name 'Users' -ErrorAction SilentlyContinue
         if (-not $usersGroup) {
-            $usersGroup = Get-LocalGroup -Name 'Пользователи' -ErrorAction SilentlyContinue
+            $usersGroup = Get-LocalGroup -Name $UsersGroupRu -ErrorAction SilentlyContinue
         }
         if ($usersGroup -and (Get-LocalGroupMember -Group $usersGroup.Name -Member $name -ErrorAction SilentlyContinue)) {
             Remove-LocalGroupMember -Group $usersGroup.Name -Member $name -ErrorAction SilentlyContinue
@@ -260,11 +252,11 @@ foreach ($name in $names) {
     $line = "{0}`t{1}`t{2:yyyy-MM-dd HH:mm:ss}Z" -f $name, $plain, (Get-Date).ToUniversalTime()
     Add-Content -LiteralPath $PasswordsFile -Value $line -Encoding UTF8
 
-    Write-Host "[OK]   $name создан. Папки и ACL готовы."
+    Write-Host "[OK]   $name created. Folders and ACL ready."
     $created++
 }
 
 Write-Host ""
-Write-Host "Готово. Создано: $created; пропущено: $skipped."
-Write-Host "Пароли: $PasswordsFile"
-Write-Host "Храните user-passwords.txt в безопасном месте."
+Write-Host "Done. Created: $created; skipped: $skipped."
+Write-Host "Passwords: $PasswordsFile"
+Write-Host "Keep user-passwords.txt in a safe place."

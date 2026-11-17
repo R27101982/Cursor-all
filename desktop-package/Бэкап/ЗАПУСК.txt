@@ -1,19 +1,22 @@
-Сервер: LS1
-Пользователь: admin
-Папка скрипта: C:\Users\admin\Desktop\BackupUsers\
+Server: LS1
+User: admin
+Script folder: C:\Users\admin\Desktop\BackupUsers\
 
-Запуск (PowerShell от имени администратора):
+Run (Administrator PowerShell):
 
 powershell -ExecutionPolicy Bypass -File C:\Users\admin\Desktop\BackupUsers\New-BackupUsers.ps1
 
-Перед запуском:
-1. Папка скрипта: C:\Users\admin\Desktop\BackupUsers\New-BackupUsers.ps1
-2. Список имён: C:\Users\admin\Desktop\Пользователи.txt (по одному имени в строке)
-3. Группа Quantor уже существует
-4. Войти как admin на LS1 и запустить команду выше от администратора
+Before run:
+1. Put New-BackupUsers.ps1 into C:\Users\admin\Desktop\BackupUsers\
+2. Create users list (one name per line):
+   C:\Users\admin\Desktop\Пользователи.txt
+   OR ASCII alternative:
+   C:\Users\admin\Desktop\Users.txt
+3. Group Quantor must already exist
+4. Sign in as admin on LS1, run the command above as Administrator
 
-Скрипт сам использует:
-- пароли → C:\Users\admin\Desktop\user-passwords.txt
-- папки  → C:\Users\admin\Desktop\Backup\QformProjects\<User>\...
-           C:\Users\admin\Desktop\Backup\Support\<User>\...
-- ACL: SYSTEM + Администраторы + LS1\admin = Full; пользователь = Read/ReadAndExecute
+Script writes:
+- passwords -> C:\Users\admin\Desktop\user-passwords.txt
+- folders  -> C:\Users\admin\Desktop\Backup\QformProjects\<User>\Data|Versions
+             C:\Users\admin\Desktop\Backup\Support\<User>\Data|Versions
+- ACL: SYSTEM + Administrators + LS1\admin = Full; user = Read/ReadAndExecute
