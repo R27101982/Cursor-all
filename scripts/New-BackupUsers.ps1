@@ -262,8 +262,9 @@ foreach ($name in $names) {
     try {
         Add-LocalGroupMember -Group $GroupName -Member $name -ErrorAction Stop
     } catch {
-        if ($_.Exception.Message -notmatch '(?i)already.*member|уже.*входит') {
-            Write-Warning "Add to $GroupName failed for $name : $($_.Exception.Message)"
+        # Ignore "already a member"; warn on other errors (ASCII-only match)
+        if ($_.Exception.Message -notmatch '(?i)already') {
+            Write-Warning ("Add to {0} failed for {1}: {2}" -f $GroupName, $name, $_.Exception.Message)
         }
     }
 
@@ -273,8 +274,9 @@ foreach ($name in $names) {
             $usersGroup = Get-LocalGroup -Name $UsersGroupRu -ErrorAction SilentlyContinue
         }
         if ($usersGroup) {
+            $likePat = '*\{0}' -f $name
             $inUsers = Get-LocalGroupMember -Group $usersGroup.Name -ErrorAction SilentlyContinue |
-                Where-Object { $_.Name -like "*\$name" -or $_.Name -eq $name }
+                Where-Object { $_.Name -like $likePat -or $_.Name -eq $name }
             if ($inUsers) {
                 Remove-LocalGroupMember -Group $usersGroup.Name -Member $name -ErrorAction SilentlyContinue
             }
