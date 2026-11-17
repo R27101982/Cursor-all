@@ -1,0 +1,9 @@
+Запуск от имени администратора на LS1:
+
+powershell -ExecutionPolicy Bypass -File C:\Users\admin\Desktop\BackupUsers\New-BackupUsers.ps1
+
+Перед запуском:
+1. Скопируйте всю папку BackupUsers на рабочий стол: C:\Users\admin\Desktop\BackupUsers\
+2. Создайте C:\Users\admin\Desktop\Пользователи.txt (по одному имени в строке)
+3. Убедитесь, что группа Quantor уже существует
+4. Запустите PowerShell от администратора и выполните команду выше

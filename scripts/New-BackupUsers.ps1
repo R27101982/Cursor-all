@@ -47,16 +47,26 @@ function New-RandomPassword {
 }
 
 function Deny-InteractiveLogon {
-    param([Parameter(Mandatory)][string]$AccountName)
-    # AccountName: COMPUTER\user или user
+    param([Parameter(Mandatory)][string]$UserName)
+    # secedit INF принимает SID в виде *S-1-5-... (не DOMAIN\user)
+    $sid = $null
+    try {
+        $sid = ([Security.Principal.NTAccount]"$env:COMPUTERNAME\$UserName").
+            Translate([Security.Principal.SecurityIdentifier]).Value
+    } catch {
+        Write-Warning "Не удалось получить SID для $UserName. Пропуск Deny logon."
+        return
+    }
+    $principal = "*$sid"
+
     $export = Join-Path $env:TEMP ("secpol_export_{0}.inf" -f [guid]::NewGuid().ToString('N'))
     $import = Join-Path $env:TEMP ("secpol_import_{0}.inf" -f [guid]::NewGuid().ToString('N'))
     $db     = Join-Path $env:TEMP ("secpol_{0}.sdb" -f [guid]::NewGuid().ToString('N'))
 
     try {
-        & secedit.exe /export /cfg $export /areas USER_RIGHTS | Out-Null
+        $exportOut = & secedit.exe /export /cfg $export /areas USER_RIGHTS 2>&1
         if (-not (Test-Path $export)) {
-            Write-Warning "Не удалось экспортировать политику прав. Пропуск Deny logon для $AccountName"
+            Write-Warning "Не удалось экспортировать политику прав. Пропуск Deny logon для $UserName. $exportOut"
             return
         }
 
@@ -66,18 +76,16 @@ function Deny-InteractiveLogon {
             'SeDenyRemoteInteractiveLogonRight'
         )
 
-        $account = if ($AccountName -match '\\') { $AccountName } else { "$env:COMPUTERNAME\$AccountName" }
-
         $newLines = foreach ($line in $content) {
             $matched = $false
             foreach ($right in $rights) {
                 if ($line -match ("^\s*{0}\s*=" -f [regex]::Escape($right))) {
                     $matched = $true
-                    if ($line -notmatch [regex]::Escape($account)) {
+                    if ($line -notmatch [regex]::Escape($principal)) {
                         if ($line -match '=\s*$') {
-                            "$right = $account"
+                            "$right = $principal"
                         } else {
-                            "$line,$account"
+                            "$line,$principal"
                         }
                     } else {
                         $line
@@ -88,11 +96,10 @@ function Deny-InteractiveLogon {
             if (-not $matched) { $line }
         }
 
-        # Если строк прав не было — добавим в конец секции Privilege Rights
         foreach ($right in $rights) {
             $exists = $newLines | Where-Object { $_ -match ("^\s*{0}\s*=" -f [regex]::Escape($right)) }
             if (-not $exists) {
-                $newLines += "$right = $account"
+                $newLines += "$right = $principal"
             }
         }
 
@@ -107,7 +114,10 @@ function Deny-InteractiveLogon {
         $privLines = $newLines | Where-Object { $_ -match '^\s*Se\w+\s*=' }
         Set-Content -Path $import -Value ($header + $privLines) -Encoding Unicode
 
-        & secedit.exe /configure /db $db /cfg $import /areas USER_RIGHTS | Out-Null
+        $cfgOut = & secedit.exe /configure /db $db /cfg $import /areas USER_RIGHTS 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "secedit не применил Deny logon для $UserName (код $LASTEXITCODE). $cfgOut"
+        }
     }
     finally {
         Remove-Item -Path $export, $import, $db -Force -ErrorAction SilentlyContinue
@@ -236,7 +246,7 @@ foreach ($name in $names) {
         }
     } catch { }
 
-    Deny-InteractiveLogon -AccountName "$env:COMPUTERNAME\$name"
+    Deny-InteractiveLogon -UserName $name
 
     $paths = Get-UserFolderPaths -UserName $name
     foreach ($p in $paths) {
