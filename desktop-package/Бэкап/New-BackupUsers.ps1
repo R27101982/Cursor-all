@@ -235,52 +235,81 @@ foreach ($name in $names) {
     }
 
     $existing = Get-LocalUser -Name $name -ErrorAction SilentlyContinue
-    if ($existing) {
-        Write-Host "[SKIP] User exists: $name (password/folders/ACL not changed)"
+    $isNew = -not $existing
+
+    if ($isNew) {
+        Write-Host "[NEW]  Creating user: $name"
+
+        $plain = New-RandomPassword -Length 8
+        $secure = ConvertTo-SecureString $plain -AsPlainText -Force
+
+        New-LocalUser -Name $name `
+            -Password $secure `
+            -FullName $name `
+            -Description 'Backup share user (no interactive logon)' `
+            -PasswordNeverExpires `
+            -UserMayNotChangePassword `
+            -AccountNeverExpires | Out-Null
+
+        $line = "{0}`t{1}`t{2:yyyy-MM-dd HH:mm:ss}Z" -f $name, $plain, (Get-Date).ToUniversalTime()
+        Add-Content -LiteralPath $PasswordsFile -Value $line -Encoding UTF8
+    } else {
+        Write-Host "[EXIST] User exists: $name (password not changed)"
         $skipped++
-        continue
     }
 
-    Write-Host "[NEW]  Creating user: $name"
-
-    $plain = New-RandomPassword -Length 8
-    $secure = ConvertTo-SecureString $plain -AsPlainText -Force
-
-    New-LocalUser -Name $name `
-        -Password $secure `
-        -FullName $name `
-        -Description 'Backup share user (no interactive logon)' `
-        -PasswordNeverExpires `
-        -UserMayNotChangePassword `
-        -AccountNeverExpires | Out-Null
-
-    Add-LocalGroupMember -Group $GroupName -Member $name
+    # Group membership (safe if already member)
+    try {
+        Add-LocalGroupMember -Group $GroupName -Member $name -ErrorAction Stop
+    } catch {
+        if ($_.Exception.Message -notmatch '(?i)already.*member|уже.*входит') {
+            Write-Warning "Add to $GroupName failed for $name : $($_.Exception.Message)"
+        }
+    }
 
     try {
         $usersGroup = Get-LocalGroup -Name 'Users' -ErrorAction SilentlyContinue
         if (-not $usersGroup) {
             $usersGroup = Get-LocalGroup -Name $UsersGroupRu -ErrorAction SilentlyContinue
         }
-        if ($usersGroup -and (Get-LocalGroupMember -Group $usersGroup.Name -Member $name -ErrorAction SilentlyContinue)) {
-            Remove-LocalGroupMember -Group $usersGroup.Name -Member $name -ErrorAction SilentlyContinue
+        if ($usersGroup) {
+            $inUsers = Get-LocalGroupMember -Group $usersGroup.Name -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like "*\$name" -or $_.Name -eq $name }
+            if ($inUsers) {
+                Remove-LocalGroupMember -Group $usersGroup.Name -Member $name -ErrorAction SilentlyContinue
+            }
         }
     } catch { }
 
-    Deny-InteractiveLogon -UserName $name
-
+    # Folders FIRST (must not depend on Deny-InteractiveLogon succeeding)
     $paths = Get-UserFolderPaths -UserName $name
     foreach ($p in $paths) {
+        $createdNow = $false
         if (-not (Test-Path -LiteralPath $p)) {
             New-Item -ItemType Directory -Path $p -Force | Out-Null
+            $createdNow = $true
+            Write-Host "       + folder $p"
         }
-        Set-BackupFolderAcl -Path $p -UserName $name
+        # New user: ACL all folders. Existing user: ACL only newly created folders
+        # (do not rewrite ACL on folders that already existed).
+        if ($isNew -or $createdNow) {
+            Set-BackupFolderAcl -Path $p -UserName $name
+        }
     }
 
-    $line = "{0}`t{1}`t{2:yyyy-MM-dd HH:mm:ss}Z" -f $name, $plain, (Get-Date).ToUniversalTime()
-    Add-Content -LiteralPath $PasswordsFile -Value $line -Encoding UTF8
+    # Non-fatal: must not block folder creation on first run
+    try {
+        Deny-InteractiveLogon -UserName $name
+    } catch {
+        Write-Warning "Deny logon failed for $name : $($_.Exception.Message)"
+    }
 
-    Write-Host "[OK]   $name created. Folders and ACL ready."
-    $created++
+    if ($isNew) {
+        Write-Host "[OK]   $name created. Folders and ACL ready."
+        $created++
+    } else {
+        Write-Host "[OK]   $name folders checked/created."
+    }
 }
 
 Write-Host ""
