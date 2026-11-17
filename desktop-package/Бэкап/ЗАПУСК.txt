@@ -1,0 +1,10 @@
+Запуск от имени администратора:
+
+powershell -ExecutionPolicy Bypass -File C:\Users\Ruslan\Desktop\Бэкап\New-BackupUsers.ps1
+
+Перед запуском:
+1. Скопируйте содержимое этой папки в C:\Users\Ruslan\Desktop\Бэкап\
+2. Создайте C:\Users\admin\Desktop\Пользователи.txt (по одному имени в строке)
+   (если скрипт крутится под admin на LS1 — путь к списку внутри скрипта: C:\Users\admin\Desktop\Пользователи.txt)
+3. Группа Quantor должна уже существовать
+4. PowerShell от администратора → команда выше
