@@ -1,38 +1,38 @@
-Nightly queue of FreeFileSync batches (local PC time 00:00)
+Nightly queue of FreeFileSync batches (local time 00:00)
 
-1) Put all batch files in Documents, names like:
-   BatchRunPotapov.ffs_batch
-   BatchRunKartashov.ffs_batch
-   BatchRunIvanov.ffs_batch
+WHY PowerShell stays open
+-------------------------
+FreeFileSync shows a dialog (sync.ffs_lock access denied) and waits for OK/Ignore.
+The runner waits for FreeFileSync, so PowerShell stays open until that dialog is closed.
 
-2) Copy Run-AllBackupBatches.ps1 to e.g.:
-   C:\Users\admin\Desktop\BackupUsers\Run-AllBackupBatches.ps1
+FIX FreeFileSync batch (do once for each BatchRun*.ffs_batch)
+-------------------------------------------------------------
+1. Open the .ffs_batch in FreeFileSync
+2. File -> Save as batch job, enable:
+   - Auto-close
+   - Minimize / silent if available
+   - On errors: continue / ignore (not "show popup and wait")
+3. Run the batch once manually under user "admin"
+4. When lock warning appears: Ignore + "Do not show again"
+5. Save the batch again
 
-3) Edit inside the script if needed:
-   $BatchDir  = folder with .ffs_batch
-   $Filter    = BatchRun*.ffs_batch
-   $FreeFileSync path
+Task Scheduler
+--------------
+Program:   powershell.exe
+Arguments:
+  -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Run-AllBackupBatches.ps1"
+Start in:  C:\Users\admin\Desktop\BackupUsers
 
-4) Task Scheduler (taskschd.msc) on LS1:
-   - Create Task (not Basic)
-   - General:
-       Name: FreeFileSync Nightly Backups
-       Run whether user is logged on or not
-       Run with highest privileges = NO (unless you need it)
-       User: admin  (same account that can open \\PC\shares / has cmdkey saved)
-   - Triggers:
-       Daily, start 00:00:00, enabled
-   - Actions:
-       Program: powershell.exe
-       Arguments:
-         -NoProfile -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Run-AllBackupBatches.ps1"
-   - Conditions:
-       optional: Start only if network available
-   - Settings:
-       Run task as soon as possible after a scheduled start is missed = YES
-       If the task is already running = Do not start a new instance
+General tab:
+  Run whether user is logged on or not   <-- important: no console window
+  User: admin
 
-5) Test: right-click task -> Run
-   Logs: %USERPROFILE%\Documents\BackupBatchLogs\run_*.log
+Trigger: Daily 00:00
 
-Batches run one after another (queue), not in parallel.
+Batch files in Documents:
+  BatchRunPotapov.ffs_batch
+  BatchRunKartashov.ffs_batch
+  ...
+
+Logs: %USERPROFILE%\Documents\BackupBatchLogs\run_*.log
+Look for DONE / EXIT. If only RUN and no OK - FreeFileSync is stuck on a dialog.
