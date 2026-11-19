@@ -27,7 +27,7 @@ $report = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8 | ConvertFrom
 $date = $report.RunDate
 
 $lines = New-Object System.Collections.Generic.List[string]
-# optional mention from config prefix (e.g. @Backup_bot) — one line, then compact rows
+# optional mention from config prefix (e.g. @Backup_bot) - one line, then compact rows
 if ($PachcaNotifyPrefix) {
     $lines.Add($PachcaNotifyPrefix) | Out-Null
 }
