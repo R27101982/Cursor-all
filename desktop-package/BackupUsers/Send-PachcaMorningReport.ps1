@@ -1,7 +1,6 @@
 #Requires -Version 5.1
-# Morning 09:00: compact Pachca report from last-backup-report.json
-# One message for all users. Fields only:
-#   Date, Time, User, Result, Errors
+# Morning 09:00: one Pachca message, block per user, blank line between users.
+# Pachca markdown has no text color - OK uses green emoji, FAIL uses red emoji.
 
 $ErrorActionPreference = 'Stop'
 
@@ -26,14 +25,22 @@ if (-not (Test-Path -LiteralPath $Sender)) {
 $report = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $date = $report.RunDate
 
-$lines = New-Object System.Collections.Generic.List[string]
-# optional mention from config prefix (e.g. @Backup_bot) - one line, then compact rows
+# Pachca webhook markdown has no text color - use green/red circle emoji
+$okMark   = [System.Char]::ConvertFromUtf32(0x1F7E2)  # green circle
+$failMark = [System.Char]::ConvertFromUtf32(0x1F534)  # red circle
+
+$blocks = New-Object System.Collections.Generic.List[string]
 if ($PachcaNotifyPrefix) {
-    $lines.Add($PachcaNotifyPrefix) | Out-Null
+    $blocks.Add($PachcaNotifyPrefix) | Out-Null
 }
 
 foreach ($j in $report.Jobs) {
-    $result = if ($j.Status -eq 'OK') { 'OK' } else { 'FAIL' }
+    $isOk = ($j.Status -eq 'OK')
+    $resultLine = if ($isOk) {
+        "Result: $okMark OK"
+    } else {
+        "Result: $failMark FAIL"
+    }
 
     $errText = 'none'
     $errs = @($j.Errors)
@@ -48,15 +55,28 @@ foreach ($j in $report.Jobs) {
         }
     }
 
-    $line = 'Date: {0}, Time: {1} ({2}s), User: {3}, Result: {4}, Errors: {5}' -f `
-        $date, $j.FinishedLocal, $j.DurationSec, $j.User, $result, $errText
-    $lines.Add($line) | Out-Null
+    $block = @(
+        ("Date: {0}" -f $date)
+        ("Time: {0} ({1}s)" -f $j.FinishedLocal, $j.DurationSec)
+        ("User: {0}" -f $j.User)
+        $resultLine
+        ("Errors: {0}" -f $errText)
+    ) -join "`n"
+
+    $blocks.Add($block) | Out-Null
 }
 
-if ($lines.Count -eq 0 -or ($lines.Count -eq 1 -and $PachcaNotifyPrefix)) {
-    $lines.Add(('Date: {0}, Time: {1}, User: -, Result: FAIL, Errors: no jobs in report' -f $date, $report.FinishedLocal)) | Out-Null
+if ($blocks.Count -eq 0 -or ($blocks.Count -eq 1 -and $PachcaNotifyPrefix)) {
+    $blocks.Add((@(
+        ("Date: {0}" -f $date)
+        ("Time: {0}" -f $report.FinishedLocal)
+        'User: -'
+        ("Result: {0} FAIL" -f $failMark)
+        'Errors: no jobs in report'
+    ) -join "`n")) | Out-Null
 }
 
-$text = ($lines -join "`n")
+# Blank line between user blocks (and after prefix)
+$text = ($blocks -join "`n`n")
 & $Sender -Message $text -ConfigPath $ConfigPath
 Write-Host 'Morning Pachca report sent.'
