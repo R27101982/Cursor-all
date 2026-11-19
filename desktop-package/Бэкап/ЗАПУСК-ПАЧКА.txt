@@ -1,16 +1,18 @@
-Pachca bot: Backup (@Backup_bot)
-Webhook is already set in Send-PachcaMessage.ps1
+Pachca variables file
+=====================
 
-1) Copy to LS1:
-   C:\Users\admin\Desktop\BackupUsers\
-     Run-AllBackupBatches.ps1
-     Send-PachcaMessage.ps1
+File:  C:\Users\admin\Desktop\BackupUsers\pachca-config.ps1
 
-2) Add bot Backup to the Pachca chat
+$PachcaWebhookUrl   = 'https://api.pachca.com/webhooks/01M7SFTC8WAETX7XVNX2QNE85N'
+$PachcaNotifyPrefix = '@Backup_bot LS1 backup'
+$PachcaBotName      = 'Backup'
 
-3) Test:
+Required files in same folder:
+  pachca-config.ps1
+  Send-PachcaMessage.ps1
+  Run-AllBackupBatches.ps1
+
+Test:
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Send-PachcaMessage.ps1" -Message "@Backup_bot LS1 backup test"
 
-4) Nightly Run-AllBackupBatches.ps1 will post a summary starting with @Backup_bot
-
-Keep the webhook URL private (treat like a password).
+Add bot Backup to the Pachca chat first.

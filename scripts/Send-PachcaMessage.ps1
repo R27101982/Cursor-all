@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 # Send a text message to Pachca via incoming webhook URL.
-# Bot: Backup (@Backup_bot)
+# Webhook URL is read from pachca-config.ps1 (same folder).
 
 param(
     [Parameter(Mandatory = $false)]
@@ -15,17 +15,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Defaults for LS1 / bot Backup
-$DefaultWebhookUrl = 'https://api.pachca.com/webhooks/01M7SFTC8WAETX7XVNX2QNE85N'
-
 if (-not $WebhookUrl) {
-    if (Test-Path -LiteralPath $ConfigPath) {
-        . $ConfigPath
-        if ($PachcaWebhookUrl) { $WebhookUrl = $PachcaWebhookUrl }
+    if (-not (Test-Path -LiteralPath $ConfigPath)) {
+        throw "Config not found: $ConfigPath  (copy pachca-config.example.ps1 to pachca-config.ps1)"
     }
-}
-if (-not $WebhookUrl) {
-    $WebhookUrl = $DefaultWebhookUrl
+    . $ConfigPath
+    if (-not $PachcaWebhookUrl) {
+        throw 'Set $PachcaWebhookUrl in pachca-config.ps1'
+    }
+    $WebhookUrl = $PachcaWebhookUrl
 }
 
 if (-not $Message) {

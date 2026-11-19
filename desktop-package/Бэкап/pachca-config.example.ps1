@@ -1,6 +1,6 @@
-# Optional override file (copy to pachca-config.ps1 next to scripts).
-# Defaults are already set in Send-PachcaMessage.ps1 / Run-AllBackupBatches.ps1
-# for bot Backup (@Backup_bot).
+# Copy to pachca-config.ps1 and set your values:
+#   copy pachca-config.example.ps1 pachca-config.ps1
 
-$PachcaWebhookUrl = 'https://api.pachca.com/webhooks/01M7SFTC8WAETX7XVNX2QNE85N'
+$PachcaWebhookUrl   = 'https://api.pachca.com/webhooks/YOUR_WEBHOOK_ID'
 $PachcaNotifyPrefix = '@Backup_bot LS1 backup'
+$PachcaBotName      = 'Backup'

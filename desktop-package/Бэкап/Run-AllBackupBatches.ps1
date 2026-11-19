@@ -20,7 +20,7 @@ $ScriptDir        = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PachcaSender     = Join-Path $ScriptDir 'Send-PachcaMessage.ps1'
 $PachcaConfig     = Join-Path $ScriptDir 'pachca-config.ps1'
 $EnablePachcaNotify = $true
-# Pachca bot Backup (@Backup_bot) — webhook is defaulted inside Send-PachcaMessage.ps1
+# Defaults; overridden by pachca-config.ps1 if present
 $PachcaNotifyPrefix = '@Backup_bot LS1 backup'
 # --- end configure ---
 
@@ -51,12 +51,12 @@ function Send-Pachca([string]$Text) {
         Write-Log 'Pachca sender script missing - skip notify'
         return
     }
+    if (-not (Test-Path -LiteralPath $PachcaConfig)) {
+        Write-Log 'pachca-config.ps1 missing - skip notify'
+        return
+    }
     try {
-        if (Test-Path -LiteralPath $PachcaConfig) {
-            & $PachcaSender -Message $Text -ConfigPath $PachcaConfig | Out-Host
-        } else {
-            & $PachcaSender -Message $Text | Out-Host
-        }
+        & $PachcaSender -Message $Text -ConfigPath $PachcaConfig | Out-Host
         Write-Log 'Pachca notify sent'
     } catch {
         Write-Log ("Pachca notify failed: {0}" -f $_.Exception.Message)
