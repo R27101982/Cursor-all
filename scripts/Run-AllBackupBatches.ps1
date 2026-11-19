@@ -42,7 +42,7 @@ function Test-IsBenignSourceError([string]$Text) {
     # Expected on read-only source shares (user PC)
     if ($Text -match 'sync\.ffs_lock') { return $true }
     if ($Text -match 'sync\.ffs_db') { return $true }
-    if ($Text -match '(?i)block|блокиров') { return $true }
+    if ($Text -match '(?i)block') { return $true }
     if ($Text -match 'ERROR_ACCESS_DENIED' -and $Text -match 'sync\.ffs_') { return $true }
     return $false
 }
@@ -55,6 +55,10 @@ function Get-RecentErrorLines([datetime]$Since) {
     $files += Get-ChildItem -LiteralPath $BatchDir -File -ErrorAction SilentlyContinue |
         Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) -and $_.Extension -match '\.(log|html|txt)$' }
 
+    $ruErr = -join ([char[]]@(0x043E,0x0448,0x0438,0x0431))      # "oshib..."
+    $ruAtt = -join ([char[]]@(0x0412,0x043D,0x0438,0x043C,0x0430)) # "Vnima..."
+    $ruImp = -join ([char[]]@(0x043D,0x0435,0x0432,0x043E,0x0437)) # "nevoz..."
+
     foreach ($f in ($files | Sort-Object FullName -Unique)) {
         try {
             $content = Get-Content -LiteralPath $f.FullName -Encoding UTF8 -ErrorAction SilentlyContinue
@@ -62,7 +66,7 @@ function Get-RecentErrorLines([datetime]$Since) {
                 $content = Get-Content -LiteralPath $f.FullName -Encoding Default -ErrorAction SilentlyContinue
             }
             foreach ($line in $content) {
-                if ($line -match '(?i)error|ошибк|внимание|warning|невозможно') {
+                if ($line -match '(?i)error|warning|access_denied' -or $line -match $ruErr -or $line -match $ruAtt -or $line -match $ruImp) {
                     $lines.Add(('{0} | {1}' -f $f.Name, $line.Trim())) | Out-Null
                 }
             }
