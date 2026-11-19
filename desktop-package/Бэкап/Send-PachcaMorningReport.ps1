@@ -55,9 +55,17 @@ foreach ($j in $report.Jobs) {
         }
     }
 
+    # Time: HH:mm:ss = job start; (Ns) = duration
+    $startTime = $j.StartedLocal
+    if ($startTime -match '\s(\d{2}:\d{2}:\d{2})$') {
+        $startTime = $Matches[1]
+    } elseif ($startTime -match '^(\d{2}:\d{2}:\d{2})$') {
+        $startTime = $Matches[1]
+    }
+
     $block = @(
         ("Date: {0}" -f $date)
-        ("Time: {0} ({1}s)" -f $j.FinishedLocal, $j.DurationSec)
+        ("Time: {0} ({1}s)" -f $startTime, $j.DurationSec)
         ("User: {0}" -f $j.User)
         $resultLine
         ("Errors: {0}" -f $errText)
@@ -67,9 +75,11 @@ foreach ($j in $report.Jobs) {
 }
 
 if ($blocks.Count -eq 0 -or ($blocks.Count -eq 1 -and $PachcaNotifyPrefix)) {
+    $emptyStart = $report.StartedLocal
+    if ($emptyStart -match '\s(\d{2}:\d{2}:\d{2})$') { $emptyStart = $Matches[1] }
     $blocks.Add((@(
         ("Date: {0}" -f $date)
-        ("Time: {0}" -f $report.FinishedLocal)
+        ("Time: {0} (0s)" -f $emptyStart)
         'User: -'
         ("Result: {0}" -f $failMark)
         'Errors: no jobs in report'
