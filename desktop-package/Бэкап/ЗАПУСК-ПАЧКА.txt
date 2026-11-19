@@ -1,0 +1,18 @@
+Pachca variables file
+=====================
+
+File:  C:\Users\admin\Desktop\BackupUsers\pachca-config.ps1
+
+$PachcaWebhookUrl   = 'https://api.pachca.com/webhooks/01M7SFTC8WAETX7XVNX2QNE85N'
+$PachcaNotifyPrefix = '@Backup_bot LS1 backup'
+$PachcaBotName      = 'Backup'
+
+Required files in same folder:
+  pachca-config.ps1
+  Send-PachcaMessage.ps1
+  Run-AllBackupBatches.ps1
+
+Test:
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Send-PachcaMessage.ps1" -Message "@Backup_bot LS1 backup test"
+
+Add bot Backup to the Pachca chat first.
