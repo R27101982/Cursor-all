@@ -20,6 +20,8 @@ $ScriptDir        = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PachcaSender     = Join-Path $ScriptDir 'Send-PachcaMessage.ps1'
 $PachcaConfig     = Join-Path $ScriptDir 'pachca-config.ps1'
 $EnablePachcaNotify = $true
+# Pachca bot Backup (@Backup_bot) — webhook is defaulted inside Send-PachcaMessage.ps1
+$PachcaNotifyPrefix = '@Backup_bot LS1 backup'
 # --- end configure ---
 
 if (-not (Test-Path -LiteralPath $FreeFileSync)) {
@@ -49,12 +51,12 @@ function Send-Pachca([string]$Text) {
         Write-Log 'Pachca sender script missing - skip notify'
         return
     }
-    if (-not (Test-Path -LiteralPath $PachcaConfig)) {
-        Write-Log 'pachca-config.ps1 missing - skip notify'
-        return
-    }
     try {
-        & $PachcaSender -Message $Text -ConfigPath $PachcaConfig | Out-Host
+        if (Test-Path -LiteralPath $PachcaConfig) {
+            & $PachcaSender -Message $Text -ConfigPath $PachcaConfig | Out-Host
+        } else {
+            & $PachcaSender -Message $Text | Out-Host
+        }
         Write-Log 'Pachca notify sent'
     } catch {
         Write-Log ("Pachca notify failed: {0}" -f $_.Exception.Message)
@@ -124,7 +126,7 @@ Write-Log ("DONE. Jobs: {0}; problems: {1}; {2}s" -f $batches.Count, $failed, $e
 Write-Log 'EXIT'
 
 # Build Pachca message
-$prefix = 'LS1 backup'
+$prefix = $PachcaNotifyPrefix
 if (Test-Path -LiteralPath $PachcaConfig) {
     . $PachcaConfig
     if ($PachcaNotifyPrefix) { $prefix = $PachcaNotifyPrefix }

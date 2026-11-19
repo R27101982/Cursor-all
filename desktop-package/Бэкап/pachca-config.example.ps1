@@ -1,11 +1,6 @@
-# Copy this file next to the scripts as:
-#   C:\Users\admin\Desktop\BackupUsers\pachca-config.ps1
-# Do NOT commit the real URL to git.
-#
-# In Pachca: create a bot -> Incoming webhook -> copy URL
-# Add the bot to the target chat/channel.
+# Optional override file (copy to pachca-config.ps1 next to scripts).
+# Defaults are already set in Send-PachcaMessage.ps1 / Run-AllBackupBatches.ps1
+# for bot Backup (@Backup_bot).
 
-$PachcaWebhookUrl = 'https://api.pachca.com/hooks/XXXXXXXX'
-
-# Optional: mention who to ping (plain text is fine)
-$PachcaNotifyPrefix = 'LS1 backup'
+$PachcaWebhookUrl = 'https://api.pachca.com/webhooks/01M7SFTC8WAETX7XVNX2QNE85N'
+$PachcaNotifyPrefix = '@Backup_bot LS1 backup'

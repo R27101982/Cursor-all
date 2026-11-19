@@ -1,7 +1,6 @@
 #Requires -Version 5.1
 # Send a text message to Pachca via incoming webhook URL.
-# Docs: https://dev.pachca.com/guides/incoming-webhooks
-# Body: {"message":"..."}
+# Bot: Backup (@Backup_bot)
 
 param(
     [Parameter(Mandatory = $false)]
@@ -16,21 +15,23 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Defaults for LS1 / bot Backup
+$DefaultWebhookUrl = 'https://api.pachca.com/webhooks/01M7SFTC8WAETX7XVNX2QNE85N'
+
 if (-not $WebhookUrl) {
     if (Test-Path -LiteralPath $ConfigPath) {
         . $ConfigPath
         if ($PachcaWebhookUrl) { $WebhookUrl = $PachcaWebhookUrl }
     }
 }
-
 if (-not $WebhookUrl) {
-    throw "Webhook URL not set. Pass -WebhookUrl or create pachca-config.ps1 with `$PachcaWebhookUrl = 'https://...'`"
+    $WebhookUrl = $DefaultWebhookUrl
 }
+
 if (-not $Message) {
     throw 'Pass -Message "text"'
 }
 
-# Pachca incoming webhook: POST JSON {"message":"..."}; response OK
 $bodyObj = @{ message = $Message }
 $json = $bodyObj | ConvertTo-Json -Compress
 
