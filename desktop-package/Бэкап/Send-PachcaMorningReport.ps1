@@ -37,9 +37,9 @@ if ($PachcaNotifyPrefix) {
 foreach ($j in $report.Jobs) {
     $isOk = ($j.Status -eq 'OK')
     $resultLine = if ($isOk) {
-        "Result: $okMark OK"
+        "Result: $okMark"
     } else {
-        "Result: $failMark FAIL"
+        "Result: $failMark"
     }
 
     $errText = 'none'
@@ -71,7 +71,7 @@ if ($blocks.Count -eq 0 -or ($blocks.Count -eq 1 -and $PachcaNotifyPrefix)) {
         ("Date: {0}" -f $date)
         ("Time: {0}" -f $report.FinishedLocal)
         'User: -'
-        ("Result: {0} FAIL" -f $failMark)
+        ("Result: {0}" -f $failMark)
         'Errors: no jobs in report'
     ) -join "`n")) | Out-Null
 }
