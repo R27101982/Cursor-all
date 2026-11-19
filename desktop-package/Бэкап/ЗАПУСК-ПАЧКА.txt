@@ -1,0 +1,27 @@
+Pachca notifications for nightly backups
+=======================================
+
+1) In Pachca:
+   - Create a bot
+   - Enable Incoming webhook
+   - Copy webhook URL
+   - Add the bot to the chat where reports should appear
+
+2) On LS1 create file:
+   C:\Users\admin\Desktop\BackupUsers\pachca-config.ps1
+
+   Contents:
+   $PachcaWebhookUrl = 'https://api.pachca.com/hooks/YOUR_SECRET'
+   $PachcaNotifyPrefix = 'LS1 backup'
+
+3) Copy scripts next to it:
+   Run-AllBackupBatches.ps1
+   Send-PachcaMessage.ps1
+   pachca-config.ps1
+
+4) Test message:
+   powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Send-PachcaMessage.ps1" -Message "LS1 backup test"
+
+5) Nightly task already runs Run-AllBackupBatches.ps1 — after all BatchRun*.ffs_batch it will POST a summary to Pachca.
+
+Do not put the real webhook URL into git.
