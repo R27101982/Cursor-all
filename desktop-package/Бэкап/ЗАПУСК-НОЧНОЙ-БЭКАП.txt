@@ -1,38 +1,31 @@
-Nightly queue of FreeFileSync batches (local time 00:00)
+Two scheduled tasks on LS1 (local time)
+=======================================
 
-WHY PowerShell stays open
--------------------------
-FreeFileSync shows a dialog (sync.ffs_lock access denied) and waits for OK/Ignore.
-The runner waits for FreeFileSync, so PowerShell stays open until that dialog is closed.
+1) NIGHT 00:00 — run backups, save report (no Pachca)
+   Name: FreeFileSync Nightly Backups
+   Program: powershell.exe
+   Arguments:
+     -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Run-AllBackupBatches.ps1"
+   User: admin
+   Writes: %USERPROFILE%\Documents\BackupBatchLogs\last-backup-report.json
 
-FIX FreeFileSync batch (do once for each BatchRun*.ffs_batch)
--------------------------------------------------------------
-1. Open the .ffs_batch in FreeFileSync
-2. File -> Save as batch job, enable:
-   - Auto-close
-   - Minimize / silent if available
-   - On errors: continue / ignore (not "show popup and wait")
-3. Run the batch once manually under user "admin"
-4. When lock warning appears: Ignore + "Do not show again"
-5. Save the batch again
+2) MORNING 09:00 — send report to Pachca
+   Name: FreeFileSync Morning Pachca Report
+   Program: powershell.exe
+   Arguments:
+     -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Send-PachcaMorningReport.ps1"
+   User: admin
+   Needs: pachca-config.ps1 + Send-PachcaMessage.ps1 in same folder
 
-Task Scheduler
---------------
-Program:   powershell.exe
-Arguments:
-  -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Run-AllBackupBatches.ps1"
-Start in:  C:\Users\admin\Desktop\BackupUsers
+Report in Pachca includes:
+  - date / time window
+  - user (from BatchRunNAME)
+  - OK / FAIL
+  - real errors only
+  - ignores sync.ffs_lock / sync.ffs_db Access Denied on user shares
 
-General tab:
-  Run whether user is logged on or not   <-- important: no console window
-  User: admin
-
-Trigger: Daily 00:00
-
-Batch files in Documents:
-  BatchRunPotapov.ffs_batch
-  BatchRunKartashov.ffs_batch
-  ...
-
-Logs: %USERPROFILE%\Documents\BackupBatchLogs\run_*.log
-Look for DONE / EXIT. If only RUN and no OK - FreeFileSync is stuck on a dialog.
+Files in C:\Users\admin\Desktop\BackupUsers\:
+  Run-AllBackupBatches.ps1
+  Send-PachcaMorningReport.ps1
+  Send-PachcaMessage.ps1
+  pachca-config.ps1

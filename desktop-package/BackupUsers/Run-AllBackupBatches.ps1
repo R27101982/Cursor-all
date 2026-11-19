@@ -1,35 +1,21 @@
 #Requires -Version 5.1
-# Runs all FreeFileSync batch jobs in a folder, one after another,
-# then sends a summary to Pachca (optional).
-#
-# Task Scheduler:
-#   Program:  powershell.exe
-#   Arguments:
-#     -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Run-AllBackupBatches.ps1"
+# Night run (00:00): execute all BatchRun*.ffs_batch sequentially,
+# write report JSON for the morning Pachca sender (09:00).
+# Does NOT send to Pachca.
 
 $ErrorActionPreference = 'Stop'
 
 # --- configure ---
-$BatchDir = Join-Path $env:USERPROFILE 'Documents'
+$BatchDir     = Join-Path $env:USERPROFILE 'Documents'
 $FreeFileSync = 'C:\Program Files\FreeFileSync\FreeFileSync.exe'
 $LogDir       = Join-Path $env:USERPROFILE 'Documents\BackupBatchLogs'
 $Filter       = 'BatchRun*.ffs_batch'
 $TimeoutSec   = 6 * 60 * 60
-
-$ScriptDir        = Split-Path -Parent $MyInvocation.MyCommand.Path
-$PachcaSender     = Join-Path $ScriptDir 'Send-PachcaMessage.ps1'
-$PachcaConfig     = Join-Path $ScriptDir 'pachca-config.ps1'
-$EnablePachcaNotify = $true
-# Defaults; overridden by pachca-config.ps1 if present
-$PachcaNotifyPrefix = '@Backup_bot LS1 backup'
+$ReportPath   = Join-Path $LogDir 'last-backup-report.json'
 # --- end configure ---
 
-if (-not (Test-Path -LiteralPath $FreeFileSync)) {
-    throw "FreeFileSync not found: $FreeFileSync"
-}
-if (-not (Test-Path -LiteralPath $BatchDir)) {
-    throw "Batch folder not found: $BatchDir"
-}
+if (-not (Test-Path -LiteralPath $FreeFileSync)) { throw "FreeFileSync not found: $FreeFileSync" }
+if (-not (Test-Path -LiteralPath $BatchDir)) { throw "Batch folder not found: $BatchDir" }
 if (-not (Test-Path -LiteralPath $LogDir)) {
     New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 }
@@ -37,7 +23,7 @@ if (-not (Test-Path -LiteralPath $LogDir)) {
 $stamp = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $runLog = Join-Path $LogDir ("run_{0}.log" -f $stamp)
 $startedAt = Get-Date
-$results = New-Object System.Collections.Generic.List[object]
+$jobs = New-Object System.Collections.Generic.List[object]
 
 function Write-Log([string]$Message) {
     $line = '{0}  {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message
@@ -45,103 +31,134 @@ function Write-Log([string]$Message) {
     Write-Host $line
 }
 
-function Send-Pachca([string]$Text) {
-    if (-not $EnablePachcaNotify) { return }
-    if (-not (Test-Path -LiteralPath $PachcaSender)) {
-        Write-Log 'Pachca sender script missing - skip notify'
-        return
+function Get-UserFromBatchName([string]$BaseName) {
+    # BatchRunPotapov -> Potapov
+    if ($BaseName -match '^BatchRun(.+)$') { return $Matches[1] }
+    return $BaseName
+}
+
+function Test-IsBenignSourceError([string]$Text) {
+    if (-not $Text) { return $true }
+    # Expected on read-only source shares (user PC)
+    if ($Text -match 'sync\.ffs_lock') { return $true }
+    if ($Text -match 'sync\.ffs_db') { return $true }
+    if ($Text -match '(?i)block|блокиров') { return $true }
+    if ($Text -match 'ERROR_ACCESS_DENIED' -and $Text -match 'sync\.ffs_') { return $true }
+    return $false
+}
+
+function Get-RecentErrorLines([datetime]$Since) {
+    $lines = New-Object System.Collections.Generic.List[string]
+    $files = @()
+    $files += Get-ChildItem -LiteralPath $LogDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) }
+    $files += Get-ChildItem -LiteralPath $BatchDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) -and $_.Extension -match '\.(log|html|txt)$' }
+
+    foreach ($f in ($files | Sort-Object FullName -Unique)) {
+        try {
+            $content = Get-Content -LiteralPath $f.FullName -Encoding UTF8 -ErrorAction SilentlyContinue
+            if (-not $content) {
+                $content = Get-Content -LiteralPath $f.FullName -Encoding Default -ErrorAction SilentlyContinue
+            }
+            foreach ($line in $content) {
+                if ($line -match '(?i)error|ошибк|внимание|warning|невозможно') {
+                    $lines.Add(('{0} | {1}' -f $f.Name, $line.Trim())) | Out-Null
+                }
+            }
+        } catch { }
     }
-    if (-not (Test-Path -LiteralPath $PachcaConfig)) {
-        Write-Log 'pachca-config.ps1 missing - skip notify'
-        return
-    }
-    try {
-        & $PachcaSender -Message $Text -ConfigPath $PachcaConfig | Out-Host
-        Write-Log 'Pachca notify sent'
-    } catch {
-        Write-Log ("Pachca notify failed: {0}" -f $_.Exception.Message)
-    }
+    return $lines
 }
 
 Write-Log ("START batch folder: {0}" -f $BatchDir)
 
 $batches = @(Get-ChildItem -LiteralPath $BatchDir -Filter $Filter -File | Sort-Object Name)
-
 if ($batches.Count -eq 0) {
-    Write-Log ("No files matching {0} in {1}" -f $Filter, $BatchDir)
-    Send-Pachca ("LS1 backup: no BatchRun*.ffs_batch in {0}" -f $BatchDir)
-    exit 0
+    Write-Log ("No files matching {0}" -f $Filter)
 }
 
-$failed = 0
 foreach ($b in $batches) {
-    Write-Log ("RUN  {0}" -f $b.FullName)
+    $user = Get-UserFromBatchName $b.BaseName
+    Write-Log ("RUN  {0} (user {1})" -f $b.FullName, $user)
     $jobStart = Get-Date
 
     $p = Start-Process -FilePath $FreeFileSync `
         -ArgumentList("`"{0}`"" -f $b.FullName) `
-        -PassThru `
-        -WindowStyle Hidden
+        -PassThru -WindowStyle Hidden
 
     $exited = $true
-    try {
-        Wait-Process -Id $p.Id -Timeout $TimeoutSec -ErrorAction Stop
-    } catch {
-        $exited = $false
-    }
+    try { Wait-Process -Id $p.Id -Timeout $TimeoutSec -ErrorAction Stop }
+    catch { $exited = $false }
 
+    $rawErrors = New-Object System.Collections.Generic.List[string]
     $status = 'OK'
-    $code = -1
+    $exitCode = -1
+
     if (-not $exited -or -not $p.HasExited) {
-        Write-Log ("TIMEOUT {0} after {1}s - killing process" -f $b.Name, $TimeoutSec)
+        Write-Log ("TIMEOUT {0}" -f $b.Name)
         Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-        Get-Process -Name 'FreeFileSync*','ffs_*' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        $status = 'TIMEOUT'
-        $failed++
+        Get-Process -Name 'FreeFileSync*','ffs_*' -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+        $status = 'FAIL'
+        $rawErrors.Add('TIMEOUT waiting for FreeFileSync') | Out-Null
     } else {
         $p.Refresh()
-        $code = $p.ExitCode
-        if ($code -eq 0) {
-            Write-Log ("OK   {0} (exit {1})" -f $b.Name, $code)
+        $exitCode = $p.ExitCode
+        $recent = Get-RecentErrorLines -Since $jobStart
+        foreach ($e in $recent) { $rawErrors.Add($e) | Out-Null }
+
+        $realErrors = @($rawErrors | Where-Object { -not (Test-IsBenignSourceError $_) })
+
+        if ($exitCode -eq 0 -and $realErrors.Count -eq 0) {
             $status = 'OK'
+            Write-Log ("OK   {0} exit={1}" -f $b.Name, $exitCode)
+        } elseif ($realErrors.Count -eq 0) {
+            # Only benign source-lock warnings (typical exit 1)
+            $status = 'OK'
+            Write-Log ("OK   {0} exit={1} (only benign source-lock warnings)" -f $b.Name, $exitCode)
         } else {
-            # FreeFileSync often returns non-zero when there were warnings (e.g. sync.ffs_lock)
-            Write-Log ("WARN {0} (exit {1})" -f $b.Name, $code)
-            $status = 'WARN'
-            $failed++
+            $status = 'FAIL'
+            Write-Log ("FAIL {0} exit={1} realErrors={2}" -f $b.Name, $exitCode, $realErrors.Count)
         }
     }
 
     $sec = [int]((Get-Date) - $jobStart).TotalSeconds
-    $results.Add([pscustomobject]@{
-        Name   = $b.BaseName
-        Status = $status
-        Exit   = $code
-        Sec    = $sec
+    $jobs.Add([pscustomobject]@{
+        User          = $user
+        Batch         = $b.Name
+        Status        = $status
+        ExitCode      = $exitCode
+        DurationSec   = $sec
+        StartedLocal  = $jobStart.ToString('yyyy-MM-dd HH:mm:ss')
+        FinishedLocal = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        Errors        = @($rawErrors | Where-Object { -not (Test-IsBenignSourceError $_) })
+        IgnoredNoise  = @($rawErrors | Where-Object { Test-IsBenignSourceError $_ })
     }) | Out-Null
 }
 
-$elapsed = [int]((Get-Date) - $startedAt).TotalSeconds
-Write-Log ("DONE. Jobs: {0}; problems: {1}; {2}s" -f $batches.Count, $failed, $elapsed)
+$finishedAt = Get-Date
+$failCount = @($jobs | Where-Object { $_.Status -ne 'OK' }).Count
+
+$report = [pscustomobject]@{
+    Server        = $env:COMPUTERNAME
+    RunDate       = $startedAt.ToString('yyyy-MM-dd')
+    StartedLocal  = $startedAt.ToString('yyyy-MM-dd HH:mm:ss')
+    FinishedLocal = $finishedAt.ToString('yyyy-MM-dd HH:mm:ss')
+    DurationSec   = [int]($finishedAt - $startedAt).TotalSeconds
+    JobsTotal     = $jobs.Count
+    JobsFailed    = $failCount
+    RunLog        = $runLog
+    Jobs          = $jobs
+}
+
+$json = $report | ConvertTo-Json -Depth 6
+Set-Content -LiteralPath $ReportPath -Value $json -Encoding UTF8
+$datedReport = Join-Path $LogDir ("backup-report_{0}.json" -f $startedAt.ToString('yyyy-MM-dd'))
+Set-Content -LiteralPath $datedReport -Value $json -Encoding UTF8
+
+Write-Log ("REPORT {0}" -f $ReportPath)
+Write-Log ("DONE jobs={0} failed={1}" -f $jobs.Count, $failCount)
 Write-Log 'EXIT'
 
-# Build Pachca message
-$prefix = $PachcaNotifyPrefix
-if (Test-Path -LiteralPath $PachcaConfig) {
-    . $PachcaConfig
-    if ($PachcaNotifyPrefix) { $prefix = $PachcaNotifyPrefix }
-}
-
-$lines = New-Object System.Collections.Generic.List[string]
-$lines.Add(('{0}' -f $prefix)) | Out-Null
-$lines.Add(('{0:yyyy-MM-dd HH:mm} | jobs: {1} | problems: {2} | {3}s' -f (Get-Date), $batches.Count, $failed, $elapsed)) | Out-Null
-foreach ($r in $results) {
-    $lines.Add(('- {0}: {1} (exit {2}, {3}s)' -f $r.Name, $r.Status, $r.Exit, $r.Sec)) | Out-Null
-}
-$lines.Add(('log: {0}' -f $runLog)) | Out-Null
-# Note about typical lock warning on read-only source shares
-$lines.Add('note: sync.ffs_lock Access Denied on source shares is expected (read-only)') | Out-Null
-
-Send-Pachca ($lines -join "`n")
-
-if ($failed -gt 0) { exit 1 } else { exit 0 }
+if ($failCount -gt 0) { exit 1 } else { exit 0 }
