@@ -1,6 +1,10 @@
 #Requires -Version 5.1
-# Night run (00:00): execute ALL BatchRun*.ffs_batch in Documents, one by one.
-# Writes last-backup-report.json for morning Pachca report. Does NOT send to Pachca.
+# Night run (00:00): run ALL BatchRun*.ffs_batch in Documents, one by one.
+# Writes last-backup-report.json for morning Pachca. Does NOT send to Pachca.
+#
+# Important: FreeFileSync often hangs on sync.ffs_lock dialogs. This script:
+# 1) forces AutoClose + IgnoreErrors in each .ffs_batch before run
+# 2) kills a hung FreeFileSync (no CPU progress) and continues the queue
 
 $ErrorActionPreference = 'Stop'
 
@@ -9,8 +13,9 @@ $BatchDir     = Join-Path $env:USERPROFILE 'Documents'
 $FreeFileSync = 'C:\Program Files\FreeFileSync\FreeFileSync.exe'
 $LogDir       = Join-Path $env:USERPROFILE 'Documents\BackupBatchLogs'
 $TimeoutSec   = 6 * 60 * 60
+$IdleHangSec  = 180   # if FFS CPU does not grow for this long -> treat as hung dialog
+$GapSec       = 3
 $ReportPath   = Join-Path $LogDir 'last-backup-report.json'
-$GapSec       = 3   # pause between batches so FreeFileSync fully exits
 # --- end configure ---
 
 if (-not (Test-Path -LiteralPath $FreeFileSync)) { throw "FreeFileSync not found: $FreeFileSync" }
@@ -53,13 +58,106 @@ function Test-IsBenignSourceError([string]$Text) {
     return $false
 }
 
+function Ensure-BatchUnattended([string]$BatchPath) {
+    # Force settings so FFS does not wait for UI when source share is read-only
+    try {
+        [xml]$xml = Get-Content -LiteralPath $BatchPath -Encoding UTF8
+    } catch {
+        Write-Log ("WARN cannot read XML {0}: {1}" -f $BatchPath, $_.Exception.Message)
+        return
+    }
+
+    $root = $xml.DocumentElement
+    if (-not $root) { return }
+
+    # <Errors Ignore="true" Retry="0" Delay="5"/>
+    $errors = $root.SelectSingleNode('Errors')
+    if (-not $errors) {
+        $errors = $xml.CreateElement('Errors')
+        [void]$root.AppendChild($errors)
+    }
+    $errors.SetAttribute('Ignore', 'true')
+    if (-not $errors.GetAttribute('Retry')) { $errors.SetAttribute('Retry', '0') }
+    if (-not $errors.GetAttribute('Delay')) { $errors.SetAttribute('Delay', '5') }
+
+    # <Batch><ProgressDialog Minimized="true" AutoClose="true"/><ErrorDialog>Ignore</ErrorDialog>...
+    $batch = $root.SelectSingleNode('Batch')
+    if (-not $batch) {
+        $batch = $xml.CreateElement('Batch')
+        [void]$root.AppendChild($batch)
+    }
+
+    $prog = $batch.SelectSingleNode('ProgressDialog')
+    if (-not $prog) {
+        $prog = $xml.CreateElement('ProgressDialog')
+        [void]$batch.AppendChild($prog)
+    }
+    $prog.SetAttribute('Minimized', 'true')
+    $prog.SetAttribute('AutoClose', 'true')
+
+    $errDlg = $batch.SelectSingleNode('ErrorDialog')
+    if (-not $errDlg) {
+        $errDlg = $xml.CreateElement('ErrorDialog')
+        [void]$batch.AppendChild($errDlg)
+    }
+    $errDlg.InnerText = 'Ignore'
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    $settings = New-Object System.Xml.XmlWriterSettings
+    $settings.Encoding = $utf8NoBom
+    $settings.Indent = $true
+    $writer = [System.Xml.XmlWriter]::Create($BatchPath, $settings)
+    try {
+        $xml.Save($writer)
+    } finally {
+        $writer.Dispose()
+    }
+    Write-Log ("     patched unattended flags in {0}" -f $BatchPath)
+}
+
+function Wait-FreeFileSyncProcess {
+    param(
+        [Parameter(Mandatory=$true)]$Process,
+        [int]$TimeoutSec,
+        [int]$IdleHangSec
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    $lastCpu = -1.0
+    $idleSince = Get-Date
+
+    while (-not $Process.HasExited) {
+        if ((Get-Date) -ge $deadline) {
+            return 'TIMEOUT'
+        }
+
+        Start-Sleep -Seconds 5
+        try { $Process.Refresh() } catch { return 'GONE' }
+        if ($Process.HasExited) { return 'EXIT' }
+
+        $cpu = 0.0
+        try { $cpu = [double]$Process.TotalProcessorTime.TotalSeconds } catch { }
+
+        if ($cpu -gt ($lastCpu + 0.05)) {
+            $lastCpu = $cpu
+            $idleSince = Get-Date
+        } else {
+            $idleFor = ((Get-Date) - $idleSince).TotalSeconds
+            if ($idleFor -ge $IdleHangSec) {
+                return 'HUNG'
+            }
+        }
+    }
+    return 'EXIT'
+}
+
 function Get-RecentErrorLines([datetime]$Since) {
-    $lines = New-Object System.Collections.Generic.List[string]
+    $out = New-Object System.Collections.Generic.List[string]
     $files = @()
     $files += @(Get-ChildItem -LiteralPath $LogDir -File -ErrorAction SilentlyContinue |
         Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) })
     $files += @(Get-ChildItem -LiteralPath $BatchDir -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) -and $_.Extension -match '\.(log|html|txt)$' })
+        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) -and $_.Extension -match '\.(log|html|txt|json)$' })
 
     $ruErr = -join ([char[]]@(0x043E,0x0448,0x0438,0x0431))
     $ruAtt = -join ([char[]]@(0x0412,0x043D,0x0438,0x043C,0x0430))
@@ -73,17 +171,16 @@ function Get-RecentErrorLines([datetime]$Since) {
             }
             foreach ($line in $content) {
                 if ($line -match '(?i)error|warning|access_denied' -or $line -match $ruErr -or $line -match $ruAtt -or $line -match $ruImp) {
-                    $lines.Add(('{0} | {1}' -f $f.Name, $line.Trim())) | Out-Null
+                    $out.Add(('{0} | {1}' -f $f.Name, $line.Trim())) | Out-Null
                 }
             }
         } catch { }
     }
-    return ,$lines.ToArray()
+    return ,$out.ToArray()
 }
 
 Write-Log ("START batch folder: {0}" -f $BatchDir)
 
-# List ALL .ffs_batch, then keep BatchRun* (case-insensitive). More reliable than -Filter alone.
 $allBatch = @(Get-ChildItem -LiteralPath $BatchDir -File -ErrorAction Stop |
     Where-Object { $_.Extension -match '^\.ffs_batch$' })
 $batches = @($allBatch | Where-Object { $_.BaseName -like 'BatchRun*' } | Sort-Object Name)
@@ -110,46 +207,53 @@ foreach ($b in $batches) {
     $exitCode = -1
 
     try {
-        # Ensure previous FreeFileSync instance is gone (single-instance app)
         Stop-FreeFileSync
         Start-Sleep -Seconds $GapSec
 
+        Ensure-BatchUnattended -BatchPath $b.FullName
+
+        $outFile = Join-Path $LogDir ("ffs_{0}_{1}.out.txt" -f $b.BaseName, $stamp)
+        $errFile = Join-Path $LogDir ("ffs_{0}_{1}.err.txt" -f $b.BaseName, $stamp)
+
+        # Redirect stdout/stderr (FFS prints JSON result). NoNewWindow required with redirects.
         $p = Start-Process -FilePath $FreeFileSync `
-            -ArgumentList $b.FullName `
+            -ArgumentList ("`"{0}`"" -f $b.FullName) `
+            -RedirectStandardOutput $outFile `
+            -RedirectStandardError $errFile `
             -PassThru `
-            -WindowStyle Hidden
+            -NoNewWindow
 
-        if (-not $p) {
-            throw 'Start-Process returned null'
-        }
-
+        if (-not $p) { throw 'Start-Process returned null' }
         Write-Log ("     started PID {0}" -f $p.Id)
 
-        $exited = $true
-        try {
-            Wait-Process -Id $p.Id -Timeout $TimeoutSec -ErrorAction Stop
-        } catch {
-            $exited = $false
-        }
+        $waitResult = Wait-FreeFileSyncProcess -Process $p -TimeoutSec $TimeoutSec -IdleHangSec $IdleHangSec
+        Write-Log ("     wait result: {0}" -f $waitResult)
 
-        if (-not $exited) {
-            try { $p.Refresh() } catch { }
-        }
-
-        if (-not $exited -or -not $p.HasExited) {
-            Write-Log ("TIMEOUT {0}" -f $b.Name)
+        if ($waitResult -eq 'HUNG') {
+            # Typical: lock warning dialog with no CPU - sync may already be done
+            Write-Log ("     hung (no CPU {0}s) - kill and continue queue for {1}" -f $IdleHangSec, $b.Name)
+            Stop-FreeFileSync
+            $status = 'OK'
+            $exitCode = 1
+            Write-Log ("OK   {0} (closed hung FFS dialog, continued)" -f $b.Name)
+        } elseif ($waitResult -eq 'TIMEOUT') {
+            Write-Log ("     TIMEOUT - kill FreeFileSync for {0}" -f $b.Name)
             Stop-FreeFileSync
             $status = 'FAIL'
             $rawErrors.Add('TIMEOUT waiting for FreeFileSync') | Out-Null
-        } else {
+        } elseif ($waitResult -eq 'EXIT' -or $waitResult -eq 'GONE') {
             try { $p.Refresh() } catch { }
             try { $exitCode = $p.ExitCode } catch { $exitCode = -1 }
 
             $recent = @(Get-RecentErrorLines -Since $jobStart)
             foreach ($e in $recent) { $rawErrors.Add($e) | Out-Null }
+            if (Test-Path -LiteralPath $errFile) {
+                Get-Content -LiteralPath $errFile -ErrorAction SilentlyContinue | ForEach-Object {
+                    if ($_ -and $_.Trim()) { $rawErrors.Add($_.Trim()) | Out-Null }
+                }
+            }
 
             $realErrors = @($rawErrors | Where-Object { -not (Test-IsBenignSourceError $_) })
-
             if ($realErrors.Count -eq 0) {
                 $status = 'OK'
                 Write-Log ("OK   {0} exit={1}" -f $b.Name, $exitCode)
@@ -166,7 +270,6 @@ foreach ($b in $batches) {
         Stop-FreeFileSync
     }
 
-    # Always clear FFS before next batch
     Stop-FreeFileSync
     Start-Sleep -Seconds $GapSec
 
