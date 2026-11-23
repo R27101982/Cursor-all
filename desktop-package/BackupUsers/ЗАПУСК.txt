@@ -1,0 +1,22 @@
+Server: LS1
+User: admin
+Script folder: C:\Users\admin\Desktop\BackupUsers\
+
+Run (Administrator PowerShell):
+
+powershell -ExecutionPolicy Bypass -File C:\Users\admin\Desktop\BackupUsers\New-BackupUsers.ps1
+
+Before run:
+1. Put New-BackupUsers.ps1 into C:\Users\admin\Desktop\BackupUsers\
+2. Create users list (one name per line):
+   C:\Users\admin\Desktop\Пользователи.txt
+   OR ASCII alternative:
+   C:\Users\admin\Desktop\Users.txt
+3. Group Quantor must already exist
+4. Sign in as admin on LS1, run the command above as Administrator
+
+Script writes:
+- passwords -> C:\Users\admin\Desktop\user-passwords.txt
+- folders  -> C:\Users\admin\Desktop\Backup\QformProjects\<User>\Data|Versions
+             C:\Users\admin\Desktop\Backup\Support\<User>\Data|Versions
+- ACL: SYSTEM + Administrators + LS1\admin = Full; user = Read/ReadAndExecute

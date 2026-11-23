@@ -1,0 +1,3 @@
+# Local secrets — prefer not committing real webhook if you rotate it
+# (pachca-config.ps1 with real URL is currently tracked for LS1 deploy convenience)
+*.local.ps1

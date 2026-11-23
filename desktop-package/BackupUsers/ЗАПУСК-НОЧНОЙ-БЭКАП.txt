@@ -1,0 +1,31 @@
+Two scheduled tasks on LS1 (local time)
+=======================================
+
+1) NIGHT 00:00 — run backups, save report (no Pachca)
+   Name: FreeFileSync Nightly Backups
+   Program: powershell.exe
+   Arguments:
+     -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Run-AllBackupBatches.ps1"
+   User: admin
+   Writes: %USERPROFILE%\Documents\BackupBatchLogs\last-backup-report.json
+
+2) MORNING 09:00 — send report to Pachca
+   Name: FreeFileSync Morning Pachca Report
+   Program: powershell.exe
+   Arguments:
+     -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Users\admin\Desktop\BackupUsers\Send-PachcaMorningReport.ps1"
+   User: admin
+   Needs: pachca-config.ps1 + Send-PachcaMessage.ps1 in same folder
+
+Report in Pachca includes:
+  - date / time window
+  - user (from BatchRunNAME)
+  - OK / FAIL
+  - real errors only
+  - ignores sync.ffs_lock / sync.ffs_db Access Denied on user shares
+
+Files in C:\Users\admin\Desktop\BackupUsers\:
+  Run-AllBackupBatches.ps1
+  Send-PachcaMorningReport.ps1
+  Send-PachcaMessage.ps1
+  pachca-config.ps1
