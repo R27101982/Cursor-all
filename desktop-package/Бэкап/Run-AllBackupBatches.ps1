@@ -1,7 +1,6 @@
 #Requires -Version 5.1
-# Night run (00:00): execute all BatchRun*.ffs_batch sequentially,
-# write report JSON for the morning Pachca sender (09:00).
-# Does NOT send to Pachca.
+# Night run (00:00): execute ALL BatchRun*.ffs_batch in Documents, one by one.
+# Writes last-backup-report.json for morning Pachca report. Does NOT send to Pachca.
 
 $ErrorActionPreference = 'Stop'
 
@@ -9,9 +8,9 @@ $ErrorActionPreference = 'Stop'
 $BatchDir     = Join-Path $env:USERPROFILE 'Documents'
 $FreeFileSync = 'C:\Program Files\FreeFileSync\FreeFileSync.exe'
 $LogDir       = Join-Path $env:USERPROFILE 'Documents\BackupBatchLogs'
-$Filter       = 'BatchRun*.ffs_batch'
 $TimeoutSec   = 6 * 60 * 60
 $ReportPath   = Join-Path $LogDir 'last-backup-report.json'
+$GapSec       = 3   # pause between batches so FreeFileSync fully exits
 # --- end configure ---
 
 if (-not (Test-Path -LiteralPath $FreeFileSync)) { throw "FreeFileSync not found: $FreeFileSync" }
@@ -31,15 +30,22 @@ function Write-Log([string]$Message) {
     Write-Host $line
 }
 
+function Stop-FreeFileSync {
+    Get-Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.ProcessName -like 'FreeFileSync*' -or $_.ProcessName -like 'ffs_*' } |
+        ForEach-Object {
+            try { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue } catch { }
+        }
+    Start-Sleep -Seconds 1
+}
+
 function Get-UserFromBatchName([string]$BaseName) {
-    # BatchRunPotapov -> Potapov
-    if ($BaseName -match '^BatchRun(.+)$') { return $Matches[1] }
+    if ($BaseName -match '(?i)^BatchRun(.+)$') { return $Matches[1] }
     return $BaseName
 }
 
 function Test-IsBenignSourceError([string]$Text) {
     if (-not $Text) { return $true }
-    # Expected on read-only source shares (user PC)
     if ($Text -match 'sync\.ffs_lock') { return $true }
     if ($Text -match 'sync\.ffs_db') { return $true }
     if ($Text -match '(?i)block') { return $true }
@@ -50,14 +56,14 @@ function Test-IsBenignSourceError([string]$Text) {
 function Get-RecentErrorLines([datetime]$Since) {
     $lines = New-Object System.Collections.Generic.List[string]
     $files = @()
-    $files += Get-ChildItem -LiteralPath $LogDir -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) }
-    $files += Get-ChildItem -LiteralPath $BatchDir -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) -and $_.Extension -match '\.(log|html|txt)$' }
+    $files += @(Get-ChildItem -LiteralPath $LogDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) })
+    $files += @(Get-ChildItem -LiteralPath $BatchDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-1) -and $_.Extension -match '\.(log|html|txt)$' })
 
-    $ruErr = -join ([char[]]@(0x043E,0x0448,0x0438,0x0431))      # "oshib..."
-    $ruAtt = -join ([char[]]@(0x0412,0x043D,0x0438,0x043C,0x0430)) # "Vnima..."
-    $ruImp = -join ([char[]]@(0x043D,0x0435,0x0432,0x043E,0x0437)) # "nevoz..."
+    $ruErr = -join ([char[]]@(0x043E,0x0448,0x0438,0x0431))
+    $ruAtt = -join ([char[]]@(0x0412,0x043D,0x0438,0x043C,0x0430))
+    $ruImp = -join ([char[]]@(0x043D,0x0435,0x0432,0x043E,0x0437))
 
     foreach ($f in ($files | Sort-Object FullName -Unique)) {
         try {
@@ -72,60 +78,97 @@ function Get-RecentErrorLines([datetime]$Since) {
             }
         } catch { }
     }
-    return $lines
+    return ,$lines.ToArray()
 }
 
 Write-Log ("START batch folder: {0}" -f $BatchDir)
 
-$batches = @(Get-ChildItem -LiteralPath $BatchDir -Filter $Filter -File | Sort-Object Name)
+# List ALL .ffs_batch, then keep BatchRun* (case-insensitive). More reliable than -Filter alone.
+$allBatch = @(Get-ChildItem -LiteralPath $BatchDir -File -ErrorAction Stop |
+    Where-Object { $_.Extension -match '^\.ffs_batch$' })
+$batches = @($allBatch | Where-Object { $_.BaseName -like 'BatchRun*' } | Sort-Object Name)
+
+Write-Log ("Found .ffs_batch total: {0}" -f $allBatch.Count)
+if ($allBatch.Count -gt 0) {
+    Write-Log ("All batch files: {0}" -f (($allBatch | ForEach-Object { $_.Name }) -join ', '))
+}
+Write-Log ("Queue ({0}): {1}" -f $batches.Count, (($batches | ForEach-Object { $_.Name }) -join ', '))
+
 if ($batches.Count -eq 0) {
-    Write-Log ("No files matching {0}" -f $Filter)
+    Write-Log 'No BatchRun*.ffs_batch files to run'
 }
 
+$index = 0
 foreach ($b in $batches) {
+    $index++
     $user = Get-UserFromBatchName $b.BaseName
-    Write-Log ("RUN  {0} (user {1})" -f $b.FullName, $user)
+    Write-Log ("RUN [{0}/{1}] {2} (user {3})" -f $index, $batches.Count, $b.FullName, $user)
     $jobStart = Get-Date
-
-    $p = Start-Process -FilePath $FreeFileSync `
-        -ArgumentList("`"{0}`"" -f $b.FullName) `
-        -PassThru -WindowStyle Hidden
-
-    $exited = $true
-    try { Wait-Process -Id $p.Id -Timeout $TimeoutSec -ErrorAction Stop }
-    catch { $exited = $false }
 
     $rawErrors = New-Object System.Collections.Generic.List[string]
     $status = 'OK'
     $exitCode = -1
 
-    if (-not $exited -or -not $p.HasExited) {
-        Write-Log ("TIMEOUT {0}" -f $b.Name)
-        Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-        Get-Process -Name 'FreeFileSync*','ffs_*' -ErrorAction SilentlyContinue |
-            Stop-Process -Force -ErrorAction SilentlyContinue
-        $status = 'FAIL'
-        $rawErrors.Add('TIMEOUT waiting for FreeFileSync') | Out-Null
-    } else {
-        $p.Refresh()
-        $exitCode = $p.ExitCode
-        $recent = Get-RecentErrorLines -Since $jobStart
-        foreach ($e in $recent) { $rawErrors.Add($e) | Out-Null }
+    try {
+        # Ensure previous FreeFileSync instance is gone (single-instance app)
+        Stop-FreeFileSync
+        Start-Sleep -Seconds $GapSec
 
-        $realErrors = @($rawErrors | Where-Object { -not (Test-IsBenignSourceError $_) })
+        $p = Start-Process -FilePath $FreeFileSync `
+            -ArgumentList $b.FullName `
+            -PassThru `
+            -WindowStyle Hidden
 
-        if ($exitCode -eq 0 -and $realErrors.Count -eq 0) {
-            $status = 'OK'
-            Write-Log ("OK   {0} exit={1}" -f $b.Name, $exitCode)
-        } elseif ($realErrors.Count -eq 0) {
-            # Only benign source-lock warnings (typical exit 1)
-            $status = 'OK'
-            Write-Log ("OK   {0} exit={1} (only benign source-lock warnings)" -f $b.Name, $exitCode)
-        } else {
-            $status = 'FAIL'
-            Write-Log ("FAIL {0} exit={1} realErrors={2}" -f $b.Name, $exitCode, $realErrors.Count)
+        if (-not $p) {
+            throw 'Start-Process returned null'
         }
+
+        Write-Log ("     started PID {0}" -f $p.Id)
+
+        $exited = $true
+        try {
+            Wait-Process -Id $p.Id -Timeout $TimeoutSec -ErrorAction Stop
+        } catch {
+            $exited = $false
+        }
+
+        if (-not $exited) {
+            try { $p.Refresh() } catch { }
+        }
+
+        if (-not $exited -or -not $p.HasExited) {
+            Write-Log ("TIMEOUT {0}" -f $b.Name)
+            Stop-FreeFileSync
+            $status = 'FAIL'
+            $rawErrors.Add('TIMEOUT waiting for FreeFileSync') | Out-Null
+        } else {
+            try { $p.Refresh() } catch { }
+            try { $exitCode = $p.ExitCode } catch { $exitCode = -1 }
+
+            $recent = @(Get-RecentErrorLines -Since $jobStart)
+            foreach ($e in $recent) { $rawErrors.Add($e) | Out-Null }
+
+            $realErrors = @($rawErrors | Where-Object { -not (Test-IsBenignSourceError $_) })
+
+            if ($realErrors.Count -eq 0) {
+                $status = 'OK'
+                Write-Log ("OK   {0} exit={1}" -f $b.Name, $exitCode)
+            } else {
+                $status = 'FAIL'
+                Write-Log ("FAIL {0} exit={1} realErrors={2}" -f $b.Name, $exitCode, $realErrors.Count)
+            }
+        }
+    } catch {
+        $status = 'FAIL'
+        $msg = $_.Exception.Message
+        $rawErrors.Add($msg) | Out-Null
+        Write-Log ("ERROR {0}: {1}" -f $b.Name, $msg)
+        Stop-FreeFileSync
     }
+
+    # Always clear FFS before next batch
+    Stop-FreeFileSync
+    Start-Sleep -Seconds $GapSec
 
     $sec = [int]((Get-Date) - $jobStart).TotalSeconds
     $jobs.Add([pscustomobject]@{
@@ -153,10 +196,10 @@ $report = [pscustomobject]@{
     JobsTotal     = $jobs.Count
     JobsFailed    = $failCount
     RunLog        = $runLog
-    Jobs          = $jobs
+    Jobs          = @($jobs)
 }
 
-$json = $report | ConvertTo-Json -Depth 6
+$json = $report | ConvertTo-Json -Depth 8
 Set-Content -LiteralPath $ReportPath -Value $json -Encoding UTF8
 $datedReport = Join-Path $LogDir ("backup-report_{0}.json" -f $startedAt.ToString('yyyy-MM-dd'))
 Set-Content -LiteralPath $datedReport -Value $json -Encoding UTF8
